@@ -90,6 +90,13 @@ def run_backend(ip, port, routes):
             #        using multi-thread programming with the
             #        provided handle_client routine
             #
+            # handle_client(ip, port, conn, addr, routes)
+            thread = threading.Thread(
+                target=handle_client,  # Gọi hàm xử lý client
+                args=(ip, port, conn, addr, routes)  # Truyền đủ tham số
+            )
+            thread.daemon = True   # Thread tự kết thúc khi server tắt
+            thread.start()
     except socket.error as e:
       print("Socket error: {}".format(e))
 

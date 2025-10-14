@@ -201,6 +201,13 @@ class Response():
             #  TODO: implement the step of fetch the object file
             #        store in the return value of content
             #
+        try:
+            with open(filepath, "rb") as f:
+                content = f.read()
+            return len(content), content
+        except Exception as e:
+            print(f"[Response] Error reading file {filepath}: {e}")
+            content = b"<html><body><h1>500 Internal Server Error</h1></body></html>"
         return len(content), content
 
 
@@ -215,7 +222,7 @@ class Response():
         """
         reqhdr = request.headers
         rsphdr = self.headers
-
+        status_line = "HTTP/1.1 200 OK"
         #Build dynamic headers
         headers = {
                 "Accept": "{}".format(reqhdr.get("Accept", "application/json")),
@@ -246,7 +253,13 @@ class Response():
         # TODO prepare the request authentication
         #
 	# self.auth = ...
-        return str(fmt_header).encode('utf-8')
+        fmt_header = status_line + "\r\n"
+        for key, value in headers.items():
+            fmt_header += f"{key}: {value}\r\n"
+
+        fmt_header += "\r\n"  # Kết thúc phần header
+
+        return fmt_header.encode("utf-8")
 
 
     def build_notfound(self):
@@ -285,6 +298,7 @@ class Response():
         base_dir = ""
 
         #If HTML, parse and serve embedded objects
+    
         if path.endswith('.html') or mime_type == 'text/html':
             base_dir = self.prepare_content_type(mime_type = 'text/html')
         elif mime_type == 'text/css':
