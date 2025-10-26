@@ -18,6 +18,8 @@ This module provides a WeApRous object to deploy RESTful url web app with routin
 """
 
 from .backend import create_backend
+from .proxy import parse_virtual_hosts
+import threading
 
 class WeApRous:
     """The fully mutable :class:`WeApRous <WeApRous>` object, which is a lightweight,
@@ -98,4 +100,32 @@ class WeApRous:
                   "by calling app.prepare_address(ip,port)")
 
         create_backend(self.ip, self.port, self.routes)
+
+
+    def run_proxy(self):
+        """
+        Start the backend server and begin handling requests.
+
+        This method launches the TCP server using the configured IP and port,
+        and dispatches incoming requests to the registered route handlers.
+
+        :raise: Error if IP or port has not been configured.
+        """
+        if not self.ip or not self.port:
+            print("Rous app need to preapre address"
+                  "by calling app.prepare_address(ip,port)")
+            
+        proxy_routes = parse_virtual_hosts("config/proxy.conf")
+        proxy_map, policy = proxy_routes[f"{self.ip}:{self.port}"]
+        if isinstance(proxy_map, list):
+            for backend in proxy_map:
+                proxy_host, proxy_port = backend.split(":", 1)
+                backend_thread = threading.Thread(
+                    target=create_backend, 
+                    args=(proxy_host, int(proxy_port), self.routes)
+                )
+                backend_thread.start()
+        else:
+            proxy_host, proxy_port = proxy_map.split(":", 1)
+            create_backend(proxy_host, int(proxy_port), self.routes)
         

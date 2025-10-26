@@ -14,14 +14,8 @@
 
 
 """
-start_sampleapp
+start_app
 ~~~~~~~~~~~~~~~~~
-
-This module provides a sample RESTful web application using the WeApRous framework.
-
-It defines basic route handlers and launches a TCP-based backend server to serve
-HTTP requests. The application includes a login endpoint and a greeting endpoint,
-and can be configured via command-line arguments.
 """
 
 import json
@@ -47,12 +41,6 @@ def login_post(headers, body):
 @app.route('/login', methods=['GET'])
 def login_get(headers, body):
     print(f"[App] login_get with\nHeader: {headers}\nBody: {body}")
-
-    # cookie = headers.get("cookie-pair", None)
-    # if cookie:
-    #     auth = cookie.get("auth", "")
-    #     if auth == "true":
-    #         return {"auth": "true"}
     return {"auth": "true", "content": "/login.html"}
 
 @app.route('/', methods=['GET'])
@@ -78,4 +66,5 @@ if __name__ == "__main__":
 
     # Prepare and launch the RESTful application
     app.prepare_address(ip, port)
-    app.run()
+    # app.run()
+    app.run_proxy()
