@@ -291,7 +291,7 @@ class Response():
             ).encode('utf-8')
 
 
-    def build_redirect(self, path, request):
+    def build_redirect(self, path, request, new_cookie_token=None):
         """
         Constructs a standard 302 Found (redirect) HTTP response.
 
@@ -303,7 +303,7 @@ class Response():
         redirect_message = f"Redirecting to {path}"
         content_length = len(redirect_message)
 
-        if request.method == "POST" and request.path == "/login":
+        if request.method == "POST" and request.path in ["/login", "/register"]:
             return (
                 "HTTP/1.1 302 Found\r\n"
                 f"Location: {path}\r\n"
@@ -311,7 +311,8 @@ class Response():
                 f"Content-Length: {content_length}\r\n"
                 "Cache-Control: no-cache\r\n"
                 "Connection: close\r\n"
-                "Set-Cookie: auth=true"
+                f"Set-Cookie: auth=true; Path=/\r\n"
+                f"Set-Cookie: token={new_cookie_token}; Path=/\r\n"
                 "\r\n"
                 f"{redirect_message}"
             ).encode('utf-8')

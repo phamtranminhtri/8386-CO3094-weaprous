@@ -22,26 +22,53 @@ import json
 import socket
 import argparse
 import os
+import random
 
 from daemon.weaprous import WeApRous
 
 PORT = 8000  # Default port
 
 app = WeApRous()
+accounts = dict()
+
 
 @app.route('/login', methods=['POST'])
 def login_post(headers, body):
     print(f"[App] login_post with\nHeader: {headers}\nBody: {body}")
 
-    if body["username"] == "admin" and body["password"] == "password":
-        return {"auth": "true", "redirect": "/"}
+    username, password = body["username"], body["password"]
+    if (username == "admin" and password == "password") or (accounts.get(username, "") == hash(password)):
+        return {"auth": "true", "redirect": "/", "token": str(random.randint(1, 1_000_000_000))}
     
     return {"auth": "false"}
+
 
 @app.route('/login', methods=['GET'])
 def login_get(headers, body):
     print(f"[App] login_get with\nHeader: {headers}\nBody: {body}")
     return {"auth": "true", "content": "/login.html"}
+
+
+@app.route('/register', methods=['POST'])
+def register_post(headers, body):
+    print(f"[App] register_post with\nHeader: {headers}\nBody: {body}")
+
+    username, password = body["username"], body["password"]
+    if username == "admin" or username in accounts:
+        return {"auth": "false"}
+    
+    if username != "admin":
+        accounts[username] = hash(password)
+
+    return {"auth": "true", "redirect": "/", "token": str(random.randint(1, 1_000_000_000))}
+    
+
+
+@app.route('/register', methods=['GET'])
+def register_get(headers, body):
+    print(f"[App] register_get with\nHeader: {headers}\nBody: {body}")
+    return {"auth": "true", "content": "/register.html"}
+
 
 @app.route('/', methods=['GET'])
 def index(headers, body):
