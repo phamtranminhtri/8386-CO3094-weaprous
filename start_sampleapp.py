@@ -28,7 +28,7 @@ import json
 import socket
 import argparse
 
-from daemon.weaprous import WeApRous
+from daemon import WeApRous
 
 PORT = 8000  # Default port
 

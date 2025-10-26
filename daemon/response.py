@@ -219,7 +219,7 @@ class Response():
         """
         reqhdr = request.headers
         rsphdr = self.headers
-
+        status_line = "HTTP/1.1 200 OK"
         #Build dynamic headers
         headers = {
                 "Accept": "{}".format(reqhdr.get("Accept", "application/json")),
@@ -346,6 +346,7 @@ class Response():
         base_dir = ""
 
         #If HTML, parse and serve embedded objects
+    
         if path.endswith('.html') or mime_type == 'text/html':
             base_dir = self.prepare_content_type(mime_type = 'text/html')
         elif mime_type == 'text/css':
