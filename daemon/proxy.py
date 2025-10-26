@@ -157,7 +157,7 @@ def handle_client(ip, port, conn, addr, routes):
         if line.lower().startswith('host:'):
             hostname = line.split(':', 1)[1].strip()
 
-    if hostname: print("[Proxy] {} at Host: {}".format(addr, hostname))
+    print("[Proxy] {} at Host: {}".format(addr, hostname))
 
     # Resolve the matching destination in routes and need conver port
     # to integer value
@@ -206,9 +206,9 @@ def run_proxy(ip, port, routes):
         while True:
             conn, addr = proxy.accept()
             #
-            client_thread = threading.Thread(target=handle_client, args=(ip,port,conn, addr, routes))
-            client_thread.daemon = True 
-            client_thread.start()
+            #  TODO: implement the step of the client incomping connection
+            #        using multi-thread programming with the
+            #        provided handle_client routine
             #
             thread = threading.Thread(target=handle_client, args=(ip, port, conn, addr, routes))
             thread.start()
