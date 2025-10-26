@@ -91,11 +91,8 @@ def run_backend(ip, port, routes):
             #        provided handle_client routine
             #
             # handle_client(ip, port, conn, addr, routes)
-            thread = threading.Thread(
-                target=handle_client,  # Gọi hàm xử lý client
-                args=(ip, port, conn, addr, routes)  # Truyền đủ tham số
-            )
-            thread.daemon = True   # Thread tự kết thúc khi server tắt
+            
+            thread = threading.Thread(target=handle_client, args=(ip, port, conn, addr, routes))
             thread.start()
     except socket.error as e:
       print("Socket error: {}".format(e))

@@ -41,6 +41,9 @@ PROXY_PASS = {
     "app2.local": ('192.168.56.103', 9002),
 }
 
+round_robin_counter = {}
+round_robin_lock = threading.Lock()
+
 
 def forward_request(host, port, request):
     """
@@ -98,7 +101,7 @@ def resolve_routing_policy(hostname, routes):
     if isinstance(proxy_map, list):
         if len(proxy_map) == 0:
             print("[Proxy] Emtpy resolved routing of hostname {}".format(hostname))
-            print ("Empty proxy_map result")
+            print("Empty proxy_map result")
             # TODO: implement the error handling for non mapped host
             #       the policy is design by team, but it can be 
             #       basic default host in your self-defined system
@@ -107,9 +110,17 @@ def resolve_routing_policy(hostname, routes):
             proxy_port = '9000'
         elif len(proxy_map) == 1:
             proxy_host, proxy_port = proxy_map[0].split(":", 2)
-        #elif: # apply the policy handling 
+        # elif: # apply the policy handling 
         #   proxy_map
         #   policy
+        elif len(proxy_map) > 1:
+            if policy == "round-robin":
+                # TODO: Implement round robin
+                with round_robin_lock:
+                    current_index = round_robin_counter.get(hostname, 0)
+                    backend = proxy_map[current_index]
+                    round_robin_counter[hostname] = (current_index + 1) % len(proxy_map)
+                    proxy_host, proxy_port = backend.split(":", 2)
         else:
             # Out-of-handle mapped host
             proxy_host = '127.0.0.1'
@@ -199,6 +210,10 @@ def run_proxy(ip, port, routes):
             client_thread.daemon = True 
             client_thread.start()
             #
+            thread = threading.Thread(target=handle_client, args=(ip, port, conn, addr, routes))
+            thread.start()
+            # thread.join()
+            # handle_client(ip, port, conn, addr, routes)
     except socket.error as e:
       print("Socket error: {}".format(e))
 
