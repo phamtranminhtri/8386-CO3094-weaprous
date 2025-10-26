@@ -18,6 +18,8 @@ This module provides a Request object to manage and persist
 request settings (cookies, auth, proxies).
 """
 from .dictionary import CaseInsensitiveDict
+import urllib.parse
+
 
 class Request():
     """The fully mutable "class" `Request <Request>` object,
@@ -72,8 +74,8 @@ class Request():
             first_line = lines[0]
             method, path, version = first_line.split()
 
-            if path == '/':
-                path = '/index.html'
+            # if path == '/':
+            #     path = '/index.html'
         except Exception:
             return None, None
 
@@ -103,7 +105,7 @@ class Request():
         # TODO manage the webapp hook in this mounting point
         #
         
-        if not routes == {}:
+        if not routes == {}:  
             self.routes = routes
             self.hook = routes.get((self.method, self.path))
             #
@@ -111,39 +113,90 @@ class Request():
             # ...
             #
 
-        self.headers = self.prepare_headers(request)
+        parts = request.split("\r\n\r\n", 1)
+        raw_header = parts[0]
+        raw_body = None
+        if len(parts) > 1:
+            raw_body = parts[1]
+
+        self.headers = self.prepare_headers(raw_header)
+        self.body = self.prepare_body(raw_body)
+
         cookies = self.headers.get('cookie', '')
-            #
-            #  TODO: implement the cookie function here
-            #        by parsing the header            #
+        
+        if cookies:
+            self.prepare_cookies(cookies)
 
         return
 
-    def prepare_body(self, data, files, json=None):
-        self.prepare_content_length(self.body)
-        self.body = body
-        #
-        # TODO prepare the request authentication
-        #
-	# self.auth = ...
-        return
+    def prepare_body(self, data, files=None, json=None):
+        body = None
+        if not data:
+            return body
+
+        content_type = self.headers.get('content-type', '')
+        if content_type == "application/x-www-form-urlencoded":
+            list_of_tuples = urllib.parse.parse_qsl(data)
+            body = dict(list_of_tuples)
+        
+        # if json is not None:
+        #     import json as json_module
+        #     body = json_module.dumps(json).encode('utf-8')
+        #     self.headers['Content-Type'] = 'application/json'
+        # elif data:
+        #     if isinstance(data, dict):
+        #         body = '&'.join([f"{k}={v}" for k, v in data.items()]).encode('utf-8')
+        #         self.headers['Content-Type'] = 'application/x-www-form-urlencoded'
+        #     elif isinstance(data, str):
+        #         body = data.encode('utf-8')
+        #     else:
+        #         body = data
+        # elif files:
+        #     # Simple file handling - in production would use multipart/form-data
+        #     body = b''
+            
+        # self.body = body
+        self.prepare_content_length(data)
+        
+        return body
 
 
     def prepare_content_length(self, body):
-        self.headers["Content-Length"] = "0"
-        #
-        # TODO prepare the request authentication
-        #
-	# self.auth = ...
+        """Prepares the Content-Length header based on body size."""
+        if body is not None:
+            self.headers["Content-Length"] = str(len(body))
+        else:
+            self.headers["Content-Length"] = "0"
+        
         return
 
 
     def prepare_auth(self, auth, url=""):
-        #
-        # TODO prepare the request authentication
-        #
-	# self.auth = ...
+        """Prepares the request authentication.
+        
+        :param auth: Tuple of (username, password) for basic auth or auth object
+        :param url: The URL being requested
+        """
+        # if auth:
+        #     if isinstance(auth, tuple) and len(auth) == 2:
+        #         # Basic authentication
+        #         import base64
+        #         username, password = auth
+        #         credentials = f"{username}:{password}"
+        #         encoded = base64.b64encode(credentials.encode('utf-8')).decode('utf-8')
+        #         self.headers["Authorization"] = f"Basic {encoded}"
+        #     else:
+        #         # Other auth types could be implemented here
+        #         pass
+        
         return
 
     def prepare_cookies(self, cookies):
-            self.headers["Cookie"] = cookies
+        if cookies:
+            self.cookies = {}
+            for pair in cookies.split(";"):
+                pair = pair.strip()
+                if "=" in pair:
+                    key, value = pair.split("=", 1)
+                    self.cookies[key.strip()] = value.strip()
+            self.headers["cookie-pair"] = self.cookies

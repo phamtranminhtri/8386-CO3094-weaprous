@@ -109,10 +109,27 @@ class HttpAdapter:
         # Handle request hook
         if req.hook:
             print("[HttpAdapter] hook in route-path METHOD {} PATH {}".format(req.hook._route_path,req.hook._route_methods))
-            req.hook(headers = "bksysnet",body = "get in touch")
+            hook_result = req.hook(headers=req.headers, body=req.body)
             #
             # TODO: handle for App hook here
             #
+            if hook_result["auth"] == "false":
+                response = resp.build_unauthorized()
+                conn.sendall(response)
+                conn.close()
+                return
+            
+            redirect = hook_result.get("redirect", None)
+            if redirect:
+                response = resp.build_redirect(redirect, req)
+                conn.sendall(response)
+                conn.close()
+                return
+
+            content = hook_result.get("content", None)
+            if content:
+                req.path = content
+            
 
         # Build response
         response = resp.build_response(req)

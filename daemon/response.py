@@ -159,25 +159,23 @@ class Response():
             elif sub_type == 'html':
                 base_dir = BASE_DIR+"www/"
             else:
-                handle_text_other(sub_type)
+                # handle_text_other(sub_type)
+                base_dir = BASE_DIR+"static/"
         elif main_type == 'image':
             base_dir = BASE_DIR+"static/"
             self.headers['Content-Type']='image/{}'.format(sub_type)
         elif main_type == 'application':
-            base_dir = BASE_DIR+"apps/"
+            if sub_type == 'xml' or sub_type == 'zip' or sub_type == 'json':
+                base_dir = BASE_DIR+"static/"
+            else:
+                base_dir = BASE_DIR+"apps/"
             self.headers['Content-Type']='application/{}'.format(sub_type)
-        #
-        #  TODO: process other mime_type
-        #        application/xml       
-        #        application/zip
-        #        ...
-        #        text/csv
-        #        text/xml
-        #        ...
-        #        video/mp4 
-        #        video/mpeg
-        #        ...
-        #
+        elif main_type == 'video':
+            base_dir = BASE_DIR+"static/"
+            self.headers['Content-Type']='video/{}'.format(sub_type)
+        elif main_type == 'audio':
+            base_dir = BASE_DIR+"static/"
+            self.headers['Content-Type']='audio/{}'.format(sub_type)
         else:
             raise ValueError("Invalid MEME type: main_type={} sub_type={}".format(main_type,sub_type))
 
@@ -197,10 +195,16 @@ class Response():
         filepath = os.path.join(base_dir, path.lstrip('/'))
 
         print("[Response] serving the object at location {}".format(filepath))
-            #
-            #  TODO: implement the step of fetch the object file
-            #        store in the return value of content
-            #
+        
+        try:
+            with open(filepath, 'rb') as f:
+                content = f.read()
+        except FileNotFoundError:
+            content = b"404 Not Found"
+        except Exception as e:
+            print(f"[Response] Error reading file: {e}")
+            content = b"500 Internal Server Error"
+            
         return len(content), content
 
 
@@ -236,16 +240,16 @@ class Response():
                 "Warning": "199 Miscellaneous warning",
                 "User-Agent": "{}".format(reqhdr.get("User-Agent", "Chrome/123.0.0.0")),
             }
+        
+        if request.method == "POST" and request.path == "/login":
+            headers["Set-Cookie"] = "auth=true"
 
         # Header text alignment
-            #
-            #  TODO: implement the header building to create formated
-            #        header from the provied headers
-            #
-        #
-        # TODO prepare the request authentication
-        #
-	# self.auth = ...
+        fmt_header = "HTTP/1.1 200 OK\r\n"
+        for key, value in headers.items():
+            fmt_header += f"{key}: {value}\r\n"
+        fmt_header += "\r\n"
+        
         return str(fmt_header).encode('utf-8')
 
 
@@ -265,6 +269,63 @@ class Response():
                 "Connection: close\r\n"
                 "\r\n"
                 "404 Not Found"
+            ).encode('utf-8')
+
+
+    def build_unauthorized(self):
+        """
+        Constructs a standard 401 Unauthorized HTTP response.
+
+        :rtype bytes: Encoded 401 response.
+        """
+
+        return (
+                "HTTP/1.1 401 Unauthorized\r\n"
+                # "WWW-Authenticate: Basic realm=\"Access to the site\"\r\n"
+                "Content-Type: text/html\r\n"
+                "Content-Length: 16\r\n"
+                "Cache-Control: no-cache\r\n"
+                "Connection: close\r\n"
+                "\r\n"
+                "401 Unauthorized"
+            ).encode('utf-8')
+
+
+    def build_redirect(self, path, request):
+        """
+        Constructs a standard 302 Found (redirect) HTTP response.
+
+        :params path (str): The path to redirect to (e.g., "/", "/login").
+
+        :rtype bytes: Encoded 302 redirect response.
+        """
+
+        redirect_message = f"Redirecting to {path}"
+        content_length = len(redirect_message)
+
+        if request.method == "POST" and request.path == "/login":
+            return (
+                "HTTP/1.1 302 Found\r\n"
+                f"Location: {path}\r\n"
+                "Content-Type: text/html\r\n"
+                f"Content-Length: {content_length}\r\n"
+                "Cache-Control: no-cache\r\n"
+                "Connection: close\r\n"
+                "Set-Cookie: auth=true"
+                "\r\n"
+                f"{redirect_message}"
+            ).encode('utf-8')
+        
+
+        return (
+                "HTTP/1.1 302 Found\r\n"
+                f"Location: {path}\r\n"
+                "Content-Type: text/html\r\n"
+                f"Content-Length: {content_length}\r\n"
+                "Cache-Control: no-cache\r\n"
+                "Connection: close\r\n"
+                "\r\n"
+                f"{redirect_message}"
             ).encode('utf-8')
 
 
@@ -289,9 +350,16 @@ class Response():
             base_dir = self.prepare_content_type(mime_type = 'text/html')
         elif mime_type == 'text/css':
             base_dir = self.prepare_content_type(mime_type = 'text/css')
-        #
-        # TODO: add support objects
-        #
+        elif mime_type.startswith('image/'):
+            base_dir = self.prepare_content_type(mime_type = mime_type)
+        elif mime_type.startswith('video/'):
+            base_dir = self.prepare_content_type(mime_type = mime_type)
+        elif mime_type.startswith('audio/'):
+            base_dir = self.prepare_content_type(mime_type = mime_type)
+        elif mime_type in ['application/json', 'application/xml', 'application/zip']:
+            base_dir = self.prepare_content_type(mime_type = mime_type)
+        elif mime_type in ['text/plain', 'text/csv', 'text/xml']:
+            base_dir = self.prepare_content_type(mime_type = mime_type)
         else:
             return self.build_notfound()
 
