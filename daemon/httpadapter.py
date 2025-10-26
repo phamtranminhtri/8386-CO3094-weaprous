@@ -147,7 +147,6 @@ class HttpAdapter:
         :param resp: (Response) The res:class:`Response <Response>` object.
         :rtype: cookies - A dictionary of cookie key-value pairs.
         """
-        headers = getattr(req, "headers", {})
         cookies = {}
         for header in headers:
             if header.startswith("Cookie:"):
@@ -167,7 +166,7 @@ class HttpAdapter:
         response = Response()
 
         # Set encoding.
-        response.encoding = self.get_encoding_from_headers(response.headers)
+        response.encoding = get_encoding_from_headers(response.headers)
         response.raw = resp
         response.reason = response.raw.reason
 
@@ -177,7 +176,7 @@ class HttpAdapter:
             response.url = req.url
 
         # Add new cookies from the server.
-        response.cookies = self.extract_cookies(req)
+        response.cookies = extract_cookies(req)
 
         # Give the Response some context.
         response.request = req
