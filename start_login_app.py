@@ -31,6 +31,7 @@ PORT = 8000  # Default port
 app = WeApRous()
 accounts = dict()
 session_to_account = dict()
+account_to_address = dict()
 
 
 @app.route('/login', methods=['POST'])
@@ -80,13 +81,11 @@ def logout(headers, body):
     print(f"[App] logout with\nHeader: {headers}\nBody: {body}")
     
     cookie = headers.get("cookie-pair", None)
+    username = get_username(headers)
     if cookie:
-        session_id = cookie.get("session_id", None)
-        if session_id:
-            try:
-                session_to_account.pop(session_id)
-            except KeyError:
-                pass
+        session_id = cookie.get("session_id", "")
+        session_to_account.pop(session_id, None)
+    account_to_address.pop(username, None)
     return {"auth": "true", "redirect": "/login"}
 
 
@@ -94,9 +93,58 @@ def logout(headers, body):
 def index(headers, body):
     print(f"[App] index with\nHeader: {headers}\nBody: {body}")
 
+    if not authenticate(headers):
+        return {"auth": "false"}
+    
+    username = get_username(headers)
+    user_ip, user_port = account_to_address.get(username, (None, None))
+    if user_ip and user_port:
+        address_noti_message = f"Your submitted chatting address is [ {user_ip}:{user_port} ]."
+    else:
+        address_noti_message = "You need to submit a address (IP + port) before chatting."
+
+    return {"auth": "true", "content": "index.html", "placeholder": (username, address_noti_message)}
+
+
+@app.route('/submit-info', methods=['POST'])
+def submit_post(headers, body):
+    print(f"[App] submit_post with\nHeader: {headers}\nBody: {body}")
+
+    user_ip, user_port = body["ip"], body["port"]
+    
+    if not validate_address(user_ip, user_port):
+        return {"auth": "true", "redirect": "/submit-info"}
+
+    if not authenticate(headers):
+        return {"auth": "false"}
+    
+    username = get_username(headers)
+    if not username:
+        return {"auth": "false"}
+    
+    account_to_address[username] = (user_ip, int(user_port))
+    return {"auth": "true", "redirect": "/"}
+
+
+@app.route('/submit-info', methods=['GET'])
+def submit_get(headers, body):
+    print(f"[App] submit_get with\nHeader: {headers}\nBody: {body}")
     if authenticate(headers):
-        return {"auth": "true", "content": "/index.html"}
+        return {"auth": "true", "content": "/submit-info.html"}
     return {"auth": "false"}
+
+
+@app.route('/get-list', methods=['GET'])
+def get_list(headers, body):
+    print(f"[App] get_list with\nHeader: {headers}\nBody: {body}")
+    if not authenticate(headers):
+        return {"auth": "false"}
+    
+    html_list_string = ""
+    for username, (user_ip, user_port) in account_to_address.items():
+        html_list_string += f"<li><b>{username}</b>'s address: [ {user_ip}:{user_port} ]</li>\r\n"
+
+    return {"auth": "true", "content": "get-list.html", "placeholder": (html_list_string,)}
 
 
 def authenticate(headers):
@@ -107,6 +155,42 @@ def authenticate(headers):
         if auth == "true" and session_id in session_to_account:
             return True
     return False
+
+
+def get_username(headers):
+    cookie = headers.get("cookie-pair", None)
+    if cookie:
+        auth = cookie.get("auth", "")
+        session_id = cookie.get("session_id", "")
+        if auth == "true" and session_id in session_to_account:
+            return session_to_account[session_id]
+    return None
+
+
+def validate_address(ip, port):
+    parts = ip.split(".")
+
+    if len(parts) != 4:
+        return False
+    
+    try:
+        parts = list(map(int, parts))
+    except ValueError:
+        return False
+    
+    for part in parts:
+        if part < 0 or part > 255:
+            return False
+        
+    try:
+        port = int(port)
+    except ValueError:
+        return False
+
+    if port < 0 or port > 65535:
+        return False
+    
+    return True
 
 
 if __name__ == "__main__":
