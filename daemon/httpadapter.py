@@ -129,6 +129,14 @@ class HttpAdapter:
                 return
 
             content = hook_result.get("content", None)
+            placeholder = hook_result.get("placeholder", None)
+            if placeholder:
+                response = resp.build_content_placeholder(req, content, placeholder)
+                conn.sendall(response)
+                conn.close()
+                return
+
+
             if content:
                 req.path = content
             

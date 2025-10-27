@@ -288,7 +288,7 @@ class Response():
                 "Connection: close\r\n"
                 "\r\n"
                 "401 Unauthorized<br>"
-                "<a href='/login'>Login</a>\r\n"
+                "<a href='/login'>Login</a> or <a href='/register'>Register</a>\r\n"
             ).encode('utf-8')
 
 
@@ -342,6 +342,31 @@ class Response():
                 "\r\n"
                 f"{redirect_message}"
             ).encode('utf-8')
+
+
+    def build_content_placeholder(self, req, html_content, placeholders):
+        html_path = os.path.join("www", html_content)
+        with open(html_path) as f:
+            raw_html = f.read()
+        for i, placeholder in enumerate(placeholders):
+            raw_html = raw_html.replace(f"{{{{ placeholder_{i} }}}}", placeholder)
+
+        # Convert HTML to bytes
+        content = raw_html.encode('utf-8')
+        content_length = len(content)
+
+        # Build response header
+        response_header = (
+            "HTTP/1.1 200 OK\r\n"
+            "Content-Type: text/html; charset=utf-8\r\n"
+            f"Content-Length: {content_length}\r\n"
+            f"Date: {datetime.datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT')}\r\n"
+            "Cache-Control: no-cache\r\n"
+            "Connection: close\r\n"
+            "\r\n"
+        ).encode('utf-8')
+
+        return response_header + content
 
 
     def build_response(self, request):
