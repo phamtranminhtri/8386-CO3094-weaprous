@@ -283,11 +283,12 @@ class Response():
                 "HTTP/1.1 401 Unauthorized\r\n"
                 # "WWW-Authenticate: Basic realm=\"Access to the site\"\r\n"
                 "Content-Type: text/html\r\n"
-                "Content-Length: 16\r\n"
+                # "Content-Length: 16\r\n"
                 "Cache-Control: no-cache\r\n"
                 "Connection: close\r\n"
                 "\r\n"
-                "401 Unauthorized"
+                "401 Unauthorized<br>"
+                "<a href='/login'>Login</a>\r\n"
             ).encode('utf-8')
 
 
