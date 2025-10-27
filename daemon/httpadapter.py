@@ -119,11 +119,11 @@ class HttpAdapter:
                 conn.close()
                 return
             
-            new_cookie_token = hook_result.get("token", None)
+            new_session_id = hook_result.get("session_id", None)
             
             redirect = hook_result.get("redirect", None)
             if redirect:
-                response = resp.build_redirect(redirect, req, new_cookie_token)
+                response = resp.build_redirect(redirect, req, new_session_id)
                 conn.sendall(response)
                 conn.close()
                 return

@@ -30,6 +30,7 @@ PORT = 8000  # Default port
 
 app = WeApRous()
 accounts = dict()
+session_to_account = dict()
 
 
 @app.route('/login', methods=['POST'])
@@ -38,7 +39,9 @@ def login_post(headers, body):
 
     username, password = body["username"], body["password"]
     if (username == "admin" and password == "password") or (accounts.get(username, "") == hash(password)):
-        return {"auth": "true", "redirect": "/", "token": str(random.randint(1, 1_000_000_000))}
+        session_id = str(random.randint(1, 1_000_000_000))
+        session_to_account[session_id] = username
+        return {"auth": "true", "redirect": "/", "session_id": session_id}
     
     return {"auth": "false"}
 
@@ -59,15 +62,32 @@ def register_post(headers, body):
     
     if username != "admin":
         accounts[username] = hash(password)
+        
+    session_id = str(random.randint(1, 1_000_000_000))
+    session_to_account[session_id] = username
 
-    return {"auth": "true", "redirect": "/", "token": str(random.randint(1, 1_000_000_000))}
-    
+    return {"auth": "true", "redirect": "/", "session_id": session_id}
 
 
 @app.route('/register', methods=['GET'])
 def register_get(headers, body):
     print(f"[App] register_get with\nHeader: {headers}\nBody: {body}")
     return {"auth": "true", "content": "/register.html"}
+
+
+@app.route('/logout', methods=['POST'])
+def logout(headers, body):
+    print(f"[App] logout with\nHeader: {headers}\nBody: {body}")
+    
+    cookie = headers.get("cookie-pair", None)
+    if cookie:
+        session_id = cookie.get("session_id", None)
+        if session_id:
+            try:
+                session_to_account.pop(session_id)
+            except KeyError:
+                pass
+    return {"auth": "true", "redirect": "/login"}
 
 
 @app.route('/', methods=['GET'])
@@ -80,6 +100,7 @@ def index(headers, body):
         if auth == "true":
             return {"auth": "true", "content": "/index.html"}
     return {"auth": "false"}
+
 
 if __name__ == "__main__":
     # Parse command-line arguments to configure server IP and port
