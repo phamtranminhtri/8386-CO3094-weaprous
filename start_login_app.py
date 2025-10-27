@@ -94,12 +94,19 @@ def logout(headers, body):
 def index(headers, body):
     print(f"[App] index with\nHeader: {headers}\nBody: {body}")
 
+    if authenticate(headers):
+        return {"auth": "true", "content": "/index.html"}
+    return {"auth": "false"}
+
+
+def authenticate(headers):
     cookie = headers.get("cookie-pair", None)
     if cookie:
         auth = cookie.get("auth", "")
-        if auth == "true":
-            return {"auth": "true", "content": "/index.html"}
-    return {"auth": "false"}
+        session_id = cookie.get("session_id", "")
+        if auth == "true" and session_id in session_to_account:
+            return True
+    return False
 
 
 if __name__ == "__main__":
