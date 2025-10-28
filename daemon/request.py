@@ -19,7 +19,7 @@ request settings (cookies, auth, proxies).
 """
 from .dictionary import CaseInsensitiveDict
 import urllib.parse
-
+import re
 
 class Request():
     """The fully mutable "class" `Request <Request>` object,
@@ -141,20 +141,21 @@ class Request():
             # self.hook manipulation goes here
             # ...
             #
-
-        parts = request.split("\r\n\r\n", 1)
-        raw_header = parts[0]
-        raw_body = None
-        if len(parts) > 1:
-            raw_body = parts[1]
+        raw_header, raw_body = self.parse_http_request(request)
+    
+        print(f"[Request] DEBUG: Parsed header length: {len(raw_header)}")
+        print(f"[Request] DEBUG: Parsed body: {repr(raw_body)}")
 
         self.headers = self.prepare_headers(raw_header)
+        print(f"[Request] DEBUG: Parsed headers: {self.headers}")
         
         # Validate Content-Length before processing body
         self.prepare_content_length(raw_body)
         
         # Process body based on content type
         self.body = self.prepare_body(raw_body)
+        print(f"[Request] DEBUG: Final body type: {type(self.body)}")
+        print(f"[Request] DEBUG: Final body content: {repr(self.body)}")
 
         cookies = self.headers.get('cookie', '')
         
@@ -162,6 +163,79 @@ class Request():
             self.prepare_cookies(cookies)
 
         return
+    
+    def parse_http_request(self, request):
+        """
+        Parse HTTP request using regex for robust header/body separation.
+        
+        Args:
+            request: Raw HTTP request string
+            
+        Returns:
+            tuple: (header_section, body_section)
+        """
+        print(f"[Request] DEBUG: Parsing HTTP request ({len(request)} chars)")
+        print(f"[Request] DEBUG: Request preview: {repr(request[:200])}...")
+        
+        # Debug: Check what separators actually exist in the request
+        has_crlf_crlf = '\r\n\r\n' in request
+        has_lf_lf = '\n\n' in request
+        has_cr_cr = '\r\r' in request
+        
+        print(f"[Request] DEBUG: Separator analysis:")
+        print(f"[Request] DEBUG:   \\r\\n\\r\\n exists: {has_crlf_crlf}")
+        print(f"[Request] DEBUG:   \\n\\n exists: {has_lf_lf}")
+        print(f"[Request] DEBUG:   \\r\\r exists: {has_cr_cr}")
+        
+        # More comprehensive pattern that handles mixed line endings
+        separator_patterns = [
+            r'\r\n\r\n',    # Standard HTTP
+            r'\n\r\n\r',    # Mixed endings
+            r'\r\n\r\n',    # Windows style
+            r'\n\n',        # Unix style
+            r'\r\r',        # Old Mac style
+        ]
+        
+        raw_header = request
+        raw_body = ""
+        separator_used = None
+        
+        # Try each pattern until one matches
+        for pattern in separator_patterns:
+            match = re.search(pattern, request)
+            if match:
+                separator_pos = match.start()
+                separator_end = match.end()
+                
+                raw_header = request[:separator_pos]
+                raw_body = request[separator_end:]
+                separator_used = pattern
+                
+                print(f"[Request] DEBUG: Found separator '{repr(match.group())}' using pattern '{pattern}'")
+                print(f"[Request] DEBUG: Separator at position {separator_pos}-{separator_end}")
+                break
+        
+        if not separator_used:
+            print("[Request] DEBUG: No separator found with regex, trying manual search...")
+            
+            # Manual fallback - search for common patterns
+            for sep in ['\r\n\r\n', '\n\n', '\r\r']:
+                if sep in request:
+                    parts = request.split(sep, 1)
+                    if len(parts) == 2:
+                        raw_header = parts[0]
+                        raw_body = parts[1]
+                        separator_used = f"manual:{sep}"
+                        print(f"[Request] DEBUG: Manual split successful with '{repr(sep)}'")
+                        break
+        
+        print(f"[Request] DEBUG: Final result:")
+        print(f"[Request] DEBUG:   Header section: {len(raw_header)} chars")
+        print(f"[Request] DEBUG:   Body section: {len(raw_body)} chars")
+        print(f"[Request] DEBUG:   Separator used: {separator_used}")
+        print(f"[Request] DEBUG:   Body preview: {repr(raw_body[:50])}")
+        
+        return raw_header, raw_body
 
     def prepare_body(self, data, files=None, json=None):
         """
@@ -175,19 +249,31 @@ class Request():
         Returns:
             Processed body data appropriate for the content type
         """
+        print(f"[Request] DEBUG prepare_body called with data: {repr(data)}")
+        print(f"[Request] DEBUG data type: {type(data)}")
+        print(f"[Request] DEBUG data length: {len(data) if data else 'None'}")
+        
         if not data:
+            print("[Request] DEBUG: No data provided, returning None")
             return None
 
         content_type = self.headers.get('content-type', '').lower()
+        print(f"[Request] DEBUG Content-Type: {repr(content_type)}")
+        print(f"[Request] DEBUG Available headers: {list(self.headers.keys())}")
         
         # Handle different content types
         if content_type == "application/x-www-form-urlencoded":
             # Parse URL-encoded form data into dictionary
+            print("[Request] DEBUG: Processing application/x-www-form-urlencoded")
             try:
                 list_of_tuples = urllib.parse.parse_qsl(data)
-                return dict(list_of_tuples)
+                result_dict = dict(list_of_tuples)
+                print(f"[Request] DEBUG: Parsed tuples: {list_of_tuples}")
+                print(f"[Request] DEBUG: Result dict: {result_dict}")
+                return result_dict
             except Exception as e:
                 print(f"[Request] Error parsing form data: {e}")
+                print(f"[Request] DEBUG: Returning raw data due to parse error")
                 return data
                 
         elif content_type.startswith("application/json"):
@@ -210,7 +296,8 @@ class Request():
             
         else:
             # For any other content type, return raw data
-            print(f"[Request] Unknown content type '{content_type}', returning raw data")
+            print(f"[Request] DEBUG: Unknown content type '{content_type}', returning raw data")
+            print(f"[Request] DEBUG: Raw data being returned: {repr(data)}")
             return data
 
 

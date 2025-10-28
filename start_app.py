@@ -37,6 +37,20 @@ account_to_address = dict()
 @app.route('/login', methods=['POST'])
 def login_post(headers, body):
     print(f"[App] login_post with\nHeader: {headers}\nBody: {body}")
+    print(f"[App] DEBUG: Body type: {type(body)}")
+    print(f"[App] DEBUG: Body is None: {body is None}")
+    
+    if body is None:
+        print("[App] ERROR: Body is None! Cannot extract username/password")
+        return {"auth": "false"}
+    
+    if not isinstance(body, dict):
+        print(f"[App] ERROR: Body is not a dict, it's {type(body)}")
+        return {"auth": "false"}
+    
+    if "username" not in body or "password" not in body:
+        print(f"[App] ERROR: Missing username or password in body: {body.keys() if hasattr(body, 'keys') else 'no keys'}")
+        return {"auth": "false"}
 
     username, password = body["username"], body["password"]
     if (username == "admin" and password == "password") or (accounts.get(username, "") == hash(password)):
@@ -56,6 +70,15 @@ def login_get(headers, body):
 @app.route('/register', methods=['POST'])
 def register_post(headers, body):
     print(f"[App] register_post with\nHeader: {headers}\nBody: {body}")
+    print(f"[App] DEBUG: Body type: {type(body)}")
+    
+    if body is None:
+        print("[App] ERROR: Body is None! Cannot extract username/password")
+        return {"auth": "false"}
+    
+    if not isinstance(body, dict):
+        print(f"[App] ERROR: Body is not a dict, it's {type(body)}")
+        return {"auth": "false"}
 
     username, password = body["username"], body["password"]
     if username == "admin" or username in accounts:

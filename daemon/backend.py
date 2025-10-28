@@ -58,6 +58,7 @@ def handle_client(ip, port, conn, addr, routes):
     :param addr (tuple): client address (IP, port).
     :param routes (dict): Dictionary of route handlers.
     """
+    
     daemon = HttpAdapter(ip, port, conn, addr, routes)
 
     # Handle client
