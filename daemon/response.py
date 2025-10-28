@@ -128,12 +128,73 @@ class Response():
         :rtype str: MIME type string (e.g., 'text/html', 'image/png').
         """
 
+        print("[Response] BUILDING: Detecting MIME type for path: {}".format(path))
         try:
             mime_type, _ = mimetypes.guess_type(path)
         except Exception:
-            return 'application/octet-stream'
-        return mime_type or 'application/octet-stream'
+            print("[Response] BUILDING: Exception in MIME detection, defaulting to HTML")
+            return 'text/html'
+        
+        # If no extension or unknown MIME type, assume it's HTML (for routes like /login, /user, etc.)
+        if mime_type is None:
+            print("[Response] BUILDING: No MIME type detected, assuming HTML content")
+            return 'text/html'
+        
+        print("[Response] BUILDING: Detected MIME type: {}".format(mime_type))
+        return mime_type
 
+    def validate_authentication(self, auth_header):
+        """
+        Validates authentication credentials from the Authorization header.
+        
+        :param auth_header (str): Authorization header value
+        :rtype bool: True if authentication is valid, False otherwise
+        """
+        print("[Response] BUILDING: Validating authentication: {}".format(auth_header[:20] + "..." if len(auth_header) > 20 else auth_header))
+        
+        if not auth_header:
+            print("[Response] BUILDING: No authentication header provided")
+            return False
+        
+        if auth_header.startswith("Basic "):
+            # Basic authentication validation
+            try:
+                import base64
+                encoded_credentials = auth_header[6:]  # Remove "Basic "
+                decoded_credentials = base64.b64decode(encoded_credentials).decode()
+                username, password = decoded_credentials.split(":", 1)
+                
+                # Simple credential validation (you can customize this)
+                valid_users = {
+                    "admin": "password123",
+                    "user": "userpass",
+                    "test": "test123"
+                }
+                
+                if username in valid_users and valid_users[username] == password:
+                    print("[Response] BUILDING: Valid Basic authentication for user: {}".format(username))
+                    return True
+                else:
+                    print("[Response] BUILDING: Invalid credentials for user: {}".format(username))
+                    return False
+            except Exception as e:
+                print("[Response] BUILDING: Error validating Basic auth: {}".format(e))
+                return False
+        
+        elif auth_header.startswith("Bearer "):
+            # Bearer token validation
+            token = auth_header[7:]  # Remove "Bearer "
+            valid_tokens = ["abc123", "xyz789", "token456"]  # You can customize this
+            
+            if token in valid_tokens:
+                print("[Response] BUILDING: Valid Bearer token")
+                return True
+            else:
+                print("[Response] BUILDING: Invalid Bearer token")
+                return False
+        
+        print("[Response] BUILDING: Unsupported authentication method")
+        return False
 
     def prepare_content_type(self, mime_type='text/html'):
         """
@@ -159,7 +220,9 @@ class Response():
             elif sub_type == 'html':
                 base_dir = BASE_DIR+"www/"
             else:
-                handle_text_other(sub_type)
+                # IMPLEMENTED: Handle other text types - default to static directory
+                print("[Response] BUILDING: Using static directory for text/{} type".format(sub_type))
+                base_dir = BASE_DIR+"static/"
         elif main_type == 'image':
             base_dir = BASE_DIR+"static/"
             self.headers['Content-Type']='image/{}'.format(sub_type)
@@ -201,14 +264,22 @@ class Response():
             #  TODO: implement the step of fetch the object file
             #        store in the return value of content
             #
+        
+        # IMPLEMENTED: File content reading with error handling
         try:
-            with open(filepath, "rb") as f:
+            print("[Response] BUILDING: Reading file content from {}".format(filepath))
+            with open(filepath, 'rb') as f:
                 content = f.read()
+            print("[Response] BUILDING: Successfully read {} bytes".format(len(content)))
+            return len(content), content
+        except FileNotFoundError:
+            print("[Response] BUILDING: File not found, returning error content")
+            content = b"File not found"
             return len(content), content
         except Exception as e:
-            print(f"[Response] Error reading file {filepath}: {e}")
-            content = b"<html><body><h1>500 Internal Server Error</h1></body></html>"
-        return len(content), content
+            print("[Response] BUILDING: Error reading file - {}".format(e))
+            content = b"Error reading file"
+            return len(content), content
 
 
     def build_response_header(self, request):
@@ -222,44 +293,74 @@ class Response():
         """
         reqhdr = request.headers
         rsphdr = self.headers
-        status_line = "HTTP/1.1 200 OK"
+
+        # Check authentication status
+        print("[Response] BUILDING: Processing authentication headers")
+        auth_header = reqhdr.get("authorization", "")
+        is_authenticated = self.validate_authentication(auth_header)
+        
         #Build dynamic headers
         headers = {
                 "Accept": "{}".format(reqhdr.get("Accept", "application/json")),
                 "Accept-Language": "{}".format(reqhdr.get("Accept-Language", "en-US,en;q=0.9")),
-                "Authorization": "{}".format(reqhdr.get("Authorization", "Basic <credentials>")),
                 "Cache-Control": "no-cache",
                 "Content-Type": "{}".format(self.headers['Content-Type']),
                 "Content-Length": "{}".format(len(self._content)),
-#                "Cookie": "{}".format(reqhdr.get("Cookie", "sessionid=xyz789")), #dummy cooki
         #
         # TODO prepare the request authentication
         #
-	# self.auth = ...
-                "Date": "{}".format(datetime.datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S GMT")),
-                "Max-Forward": "10",
-                "Pragma": "no-cache",
-                "Proxy-Authorization": "Basic dXNlcjpwYXNz",  # example base64
-                "Warning": "199 Miscellaneous warning",
-                "User-Agent": "{}".format(reqhdr.get("User-Agent", "Chrome/123.0.0.0")),
-            }
+        # IMPLEMENTED: Enhanced authentication handling
+        }
+        
+        # Add authentication headers if needed
+        if auth_header:
+            headers["Authorization"] = auth_header
+            print("[Response] BUILDING: Added Authorization header")
+        
+        # Add authentication challenge if not authenticated
+        if not is_authenticated and request.path in ['/login', '/admin', '/secure']:
+            headers["WWW-Authenticate"] = 'Basic realm="Secure Area"'
+            print("[Response] BUILDING: Added authentication challenge")
+        
+        # Add cookies if present
+        if hasattr(request, 'cookies') and request.cookies:
+            cookie_string = "; ".join([f"{k}={v}" for k, v in request.cookies.items()])
+            headers["Set-Cookie"] = cookie_string
+            print("[Response] BUILDING: Added cookies to response")
+        
+        # Add additional headers
+        headers.update({
+            "Date": "{}".format(datetime.datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S GMT")),
+            "Max-Forward": "10", 
+            "Pragma": "no-cache",
+            "Proxy-Authorization": "Basic dXNlcjpwYXNz",  # example base64
+            "Warning": "199 Miscellaneous warning",
+            "User-Agent": "{}".format(reqhdr.get("User-Agent", "Chrome/123.0.0.0")),
+        })
 
         # Header text alignment
             #
             #  TODO: implement the header building to create formated
             #        header from the provied headers
             #
+        
+        # IMPLEMENTED: HTTP header formatting
+        print("[Response] BUILDING: Formatting HTTP response headers")
+        fmt_header = "HTTP/1.1 {} {}\r\n".format(self.status_code, self.reason)
+        print("[Response] BUILDING: Status line - HTTP/1.1 {} {}".format(self.status_code, self.reason))
+        
+        for key, value in headers.items():
+            fmt_header += "{}: {}\r\n".format(key, value)
+            print("[Response] BUILDING: Header - {}: {}".format(key, value))
+        
+        fmt_header += "\r\n"  # Empty line to separate headers from body
+        print("[Response] BUILDING: Complete header formatted ({} bytes)".format(len(fmt_header)))
+        
         #
         # TODO prepare the request authentication
         #
 	# self.auth = ...
-        fmt_header = status_line + "\r\n"
-        for key, value in headers.items():
-            fmt_header += f"{key}: {value}\r\n"
-
-        fmt_header += "\r\n"  # Kết thúc phần header
-
-        return fmt_header.encode("utf-8")
+        return str(fmt_header).encode('utf-8')
 
 
     def build_notfound(self):
@@ -295,21 +396,45 @@ class Response():
         mime_type = self.get_mime_type(path)
         print("[Response] {} path {} mime_type {}".format(request.method, request.path, mime_type))
 
+        # IMPLEMENTED: Initialize response status
+        print("[Response] BUILDING: Setting default response status 200 OK")
+        self.status_code = 200
+        self.reason = "OK"
+        
         base_dir = ""
 
         #If HTML, parse and serve embedded objects
-    
+        print("[Response] BUILDING: Determining content type and base directory")
         if path.endswith('.html') or mime_type == 'text/html':
+            print("[Response] BUILDING: Processing HTML content")
+            # Handle paths without .html extension by adding it
+            if not path.endswith('.html') and not path.endswith('/'):
+                path = path + '.html'
+                print("[Response] BUILDING: Adjusted path to: {}".format(path))
             base_dir = self.prepare_content_type(mime_type = 'text/html')
         elif mime_type == 'text/css':
+            print("[Response] BUILDING: Processing CSS content")
             base_dir = self.prepare_content_type(mime_type = 'text/css')
+        elif mime_type.startswith('image/'):
+            print("[Response] BUILDING: Processing image content")
+            base_dir = self.prepare_content_type(mime_type = mime_type)
         #
-        # TODO: add support objects
+        # TODO: add support for other objects
         #
         else:
+            print("[Response] BUILDING: Unsupported MIME type, returning 404")
             return self.build_notfound()
 
+        print("[Response] BUILDING: Loading content from base directory: {}".format(base_dir))
         c_len, self._content = self.build_content(path, base_dir)
+        
+        # IMPLEMENTED: File not found handling
+        if c_len == 0 or self._content == b"File not found":
+            print("[Response] BUILDING: File not accessible, returning 404")
+            return self.build_notfound()
+            
+        print("[Response] BUILDING: Building response headers")
         self._header = self.build_response_header(request)
 
+        print("[Response] BUILDING: Combining headers ({} bytes) and content ({} bytes)".format(len(self._header), len(self._content)))
         return self._header + self._content

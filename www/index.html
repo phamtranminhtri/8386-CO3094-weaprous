@@ -1,21 +1,963 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-    <title>bksysnet@hcmut welcome</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WeApRous Hybrid Chat System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-    <meta charset="utf-8" />
-    <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="stylesheet" href="css/styles.css" />
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .chat-container {
+            width: 95%;
+            max-width: 1400px;
+            height: 90vh;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 300px;
+            background: #2c3e50;
+            color: white;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .user-info {
+            padding: 20px;
+            background: #34495e;
+            border-bottom: 1px solid #4a5f7a;
+        }
+
+        .user-avatar {
+            width: 50px;
+            height: 50px;
+            background: #3498db;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .peer-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #2ecc71;
+        }
+
+        .status-indicator.offline { background: #e74c3c; }
+        .status-indicator.connecting { background: #f39c12; }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            background: #34495e;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .tab.active {
+            background: #2c3e50;
+            border-bottom-color: #3498db;
+        }
+
+        .tab:hover { background: #2c3e50; }
+
+        /* Tab Content */
+        .tab-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .tab-pane {
+            display: none;
+        }
+
+        .tab-pane.active {
+            display: block;
+        }
+
+        /* Channel List */
+        .channel-item, .peer-item {
+            padding: 12px;
+            margin: 5px 0;
+            background: #34495e;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .channel-item:hover, .peer-item:hover {
+            background: #4a5f7a;
+        }
+
+        .channel-item.active {
+            background: #3498db;
+        }
+
+        .channel-badge, .peer-badge {
+            background: #e74c3c;
+            color: white;
+            border-radius: 10px;
+            padding: 2px 8px;
+            font-size: 12px;
+        }
+
+        .peer-badge.online { background: #2ecc71; }
+
+        /* Main Chat Area */
+        .main-chat {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #f8f9fa;
+        }
+
+        .chat-header {
+            padding: 20px;
+            background: white;
+            border-bottom: 1px solid #dee2e6;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chat-title {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .chat-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .btn-primary { background: #3498db; color: white; }
+        .btn-success { background: #2ecc71; color: white; }
+        .btn-warning { background: #f39c12; color: white; }
+        .btn-danger { background: #e74c3c; color: white; }
+
+        .btn:hover { opacity: 0.8; }
+
+        /* Messages Area */
+        .messages-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
+        .message.own {
+            flex-direction: row-reverse;
+        }
+
+        .message-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #3498db;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .message-content {
+            max-width: 70%;
+            background: white;
+            padding: 12px 16px;
+            border-radius: 18px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .message.own .message-content {
+            background: #3498db;
+            color: white;
+        }
+
+        .message-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+            font-size: 12px;
+            opacity: 0.7;
+        }
+
+        .message-type {
+            background: #e74c3c;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 10px;
+        }
+
+        .message-type.broadcast { background: #f39c12; }
+        .message-type.p2p { background: #2ecc71; }
+
+        /* Message Input */
+        .message-input-container {
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #dee2e6;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .message-input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 1px solid #dee2e6;
+            border-radius: 25px;
+            font-size: 14px;
+            outline: none;
+        }
+
+        .message-input:focus {
+            border-color: #3498db;
+            box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            max-width: 500px;
+            width: 90%;
+        }
+
+        .modal-header {
+            font-size: 20px;
+            margin-bottom: 20px;
+            color: #2c3e50;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 5px;
+            color: #2c3e50;
+            font-weight: 500;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+        }
+
+        /* Notifications */
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            background: #2ecc71;
+            color: white;
+            border-radius: 6px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            z-index: 1001;
+            opacity: 0;
+            transform: translateX(100%);
+            transition: all 0.3s;
+        }
+
+        .notification.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .notification.error { background: #e74c3c; }
+        .notification.warning { background: #f39c12; }
+
+        /* Registration Panel */
+        .registration-panel {
+            padding: 20px;
+            background: #ecf0f1;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .registration-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .auto-ip {
+            font-family: monospace;
+            background: #34495e;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+    </style>
 </head>
 
 <body>
-<div>
-    <h1>bksysnet@hcmut  Domain</h1>
-    <p>This domain is for use in illustrative examples in documents.
-    </p>
-  
-       <img src="images/welcome.png" alt="bksysnet at HCMUT" width="500" height="600">  
-</div>
+    <div class="chat-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <!-- User Info -->
+            <div class="user-info">
+                <div class="user-avatar" id="userAvatar">A</div>
+                <div class="user-name" id="userName">Admin User</div>
+                <div class="peer-status">
+                    <div class="status-indicator" id="peerStatus"></div>
+                    <span id="peerStatusText">Offline</span>
+                </div>
+                <div class="auto-ip" id="autoIP">IP: Detecting...</div>
+            </div>
+
+            <!-- Peer Registration Panel -->
+            <div class="registration-panel">
+                <h3>Peer Registration</h3>
+                <div class="registration-status">
+                    <span>Status:</span>
+                    <span id="registrationStatus">Not Registered</span>
+                </div>
+                <button class="btn btn-primary" id="registerBtn" onclick="registerPeer()">Register as Peer</button>
+            </div>
+
+            <!-- Tabs -->
+            <div class="tabs">
+                <div class="tab active" onclick="switchTab('channels')">Channels</div>
+                <div class="tab" onclick="switchTab('peers')">Peers</div>
+            </div>
+
+            <!-- Tab Content -->
+            <div class="tab-content">
+                <div class="tab-pane active" id="channelsPane">
+                    <div style="padding: 10px;">
+                        <button class="btn btn-success" style="width: 100%; margin-bottom: 10px;" onclick="showCreateChannelModal()">+ Create Channel</button>
+                    </div>
+                    <div id="channelsList"></div>
+                </div>
+                <div class="tab-pane" id="peersPane">
+                    <div style="padding: 10px;">
+                        <button class="btn btn-primary" style="width: 100%; margin-bottom: 10px;" onclick="refreshPeers()">🔄 Refresh Peers</button>
+                    </div>
+                    <div id="peersList"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Chat Area -->
+        <div class="main-chat">
+            <!-- Chat Header -->
+            <div class="chat-header">
+                <div class="chat-title" id="chatTitle">Select a Channel</div>
+                <div class="chat-actions">
+                    <button class="btn btn-warning" onclick="broadcastMessage()">📢 Broadcast</button>
+                    <button class="btn btn-primary" onclick="refreshMessages()">🔄 Refresh</button>
+                </div>
+            </div>
+
+            <!-- Messages Container -->
+            <div class="messages-container" id="messagesContainer">
+                <div style="text-align: center; color: #7f8c8d; margin-top: 50px;">
+                    <h3>Welcome to WeApRous Hybrid Chat</h3>
+                    <p>Register as a peer and join a channel to start chatting!</p>
+                    <div style="margin-top: 20px;">
+                        <div><strong>API Endpoints Available:</strong></div>
+                        <div style="font-family: monospace; font-size: 12px; margin-top: 10px;">
+                            <div>POST /submit-info/ - Register peer</div>
+                            <div>GET /get-list/ - Get peer list</div>
+                            <div>POST /add-list/ - Create/join channel</div>
+                            <div>GET /send-peer/ - Get messages</div>
+                            <div>POST /send-peer/ - Send message</div>
+                            <div>POST /broadcast-peer/ - Broadcast message</div>
+                            <div>POST /connect-peer/ - Connect to peer</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Message Input -->
+            <div class="message-input-container">
+                <div class="input-group">
+                    <input type="text" class="message-input" id="messageInput" placeholder="Type your message..." onkeypress="handleMessageKeyPress(event)" disabled>
+                    <button class="btn btn-primary" onclick="sendMessage()" id="sendBtn" disabled>Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <!-- Create Channel Modal -->
+    <div class="modal" id="createChannelModal">
+        <div class="modal-content">
+            <div class="modal-header">Create New Channel</div>
+            <div class="form-group">
+                <label class="form-label">Channel Name:</label>
+                <input type="text" class="form-input" id="newChannelName" placeholder="Enter channel name">
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: end;">
+                <button class="btn btn-danger" onclick="hideCreateChannelModal()">Cancel</button>
+                <button class="btn btn-success" onclick="createChannel()">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Broadcast Modal -->
+    <div class="modal" id="broadcastModal">
+        <div class="modal-content">
+            <div class="modal-header">Broadcast Message</div>
+            <div class="form-group">
+                <label class="form-label">Message:</label>
+                <textarea class="form-input" id="broadcastMessage" rows="4" placeholder="Enter broadcast message"></textarea>
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: end;">
+                <button class="btn btn-danger" onclick="hideBroadcastModal()">Cancel</button>
+                <button class="btn btn-warning" onclick="sendBroadcast()">📢 Broadcast</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notifications -->
+    <div class="notification" id="notification"></div>
+
+    <script>
+        // Global state
+        let currentPeerId = null;
+        let currentChannel = null;
+        let isRegistered = false;
+        let localIP = '127.0.0.1';
+        let peerPort = 9100;
+
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', function() {
+            detectLocalIP();
+            initializeApp();
+            startMessagePolling();
+        });
+
+        // Detect local IP
+        function detectLocalIP() {
+            // Simple IP detection for display purposes
+            const rtc = new RTCPeerConnection({iceServers: [{urls: 'stun:stun.l.google.com:19302'}]});
+            rtc.createDataChannel('test');
+            rtc.createOffer().then(offer => rtc.setLocalDescription(offer));
+            
+            rtc.onicecandidate = (event) => {
+                if (event.candidate) {
+                    const ip = event.candidate.candidate.split(' ')[4];
+                    if (ip !== '127.0.0.1' && ip.includes('.')) {
+                        localIP = ip;
+                        document.getElementById('autoIP').textContent = `IP: ${localIP}`;
+                        peerPort = 9100 + Math.floor(Math.random() * 100); // Random port
+                    }
+                }
+            };
+        }
+
+        // Initialize application
+        function initializeApp() {
+            currentPeerId = 'user_' + Math.random().toString(36).substr(2, 9);
+            document.getElementById('userName').textContent = currentPeerId;
+            document.getElementById('userAvatar').textContent = currentPeerId[0].toUpperCase();
+            
+            loadChannels();
+            loadPeers();
+        }
+
+        // API Functions
+        async function apiCall(method, endpoint, data = null) {
+            try {
+                const options = {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    credentials: 'include'
+                };
+
+                if (data && method !== 'GET') {
+                    options.body = JSON.stringify(data);
+                }
+
+                const response = await fetch(endpoint, options);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                return await response.json();
+            } catch (error) {
+                console.error('API Error:', error);
+                showNotification('API Error: ' + error.message, 'error');
+                throw error;
+            }
+        }
+
+        // Peer Registration
+        async function registerPeer() {
+            try {
+                showNotification('Registering peer...', 'info');
+                
+                const data = {
+                    peer_id: currentPeerId,
+                    ip: localIP,
+                    port: peerPort
+                };
+
+                const result = await apiCall('POST', '/submit-info/', data);
+                
+                if (result.status === 'success') {
+                    isRegistered = true;
+                    updatePeerStatus('online', 'Registered');
+                    document.getElementById('registrationStatus').textContent = `Registered (${localIP}:${peerPort})`;
+                    document.getElementById('registerBtn').disabled = true;
+                    document.getElementById('messageInput').disabled = false;
+                    document.getElementById('sendBtn').disabled = false;
+                    
+                    showNotification('Peer registered successfully!', 'success');
+                    loadPeers();
+                } else {
+                    throw new Error('Registration failed');
+                }
+            } catch (error) {
+                showNotification('Registration failed: ' + error.message, 'error');
+            }
+        }
+
+        // Channel Management
+        async function loadChannels() {
+            try {
+                const result = await apiCall('GET', '/get-list/');
+                const channelsList = document.getElementById('channelsList');
+                channelsList.innerHTML = '';
+
+                if (result.channels && result.channels.length > 0) {
+                    result.channels.forEach(channel => {
+                        const item = document.createElement('div');
+                        item.className = 'channel-item';
+                        item.onclick = () => joinChannel(channel.name);
+                        
+                        item.innerHTML = `
+                            <span># ${channel.name}</span>
+                            <span class="channel-badge">${channel.peer_count || 0}</span>
+                        `;
+                        channelsList.appendChild(item);
+                    });
+                } else {
+                    channelsList.innerHTML = '<div style="padding: 10px; text-align: center; color: #7f8c8d;">No channels available</div>';
+                }
+            } catch (error) {
+                console.error('Failed to load channels:', error);
+            }
+        }
+
+        async function createChannel() {
+            const channelName = document.getElementById('newChannelName').value.trim();
+            if (!channelName) {
+                showNotification('Please enter a channel name', 'warning');
+                return;
+            }
+
+            try {
+                const data = {
+                    action: 'create',
+                    channel_name: channelName
+                };
+
+                const result = await apiCall('POST', '/add-list/', data);
+                
+                if (result.status === 'success') {
+                    hideCreateChannelModal();
+                    showNotification('Channel created successfully!', 'success');
+                    loadChannels();
+                    joinChannel(channelName);
+                } else {
+                    throw new Error('Failed to create channel');
+                }
+            } catch (error) {
+                showNotification('Failed to create channel: ' + error.message, 'error');
+            }
+        }
+
+        async function joinChannel(channelName) {
+            if (!isRegistered) {
+                showNotification('Please register as peer first', 'warning');
+                return;
+            }
+
+            try {
+                const data = {
+                    action: 'join',
+                    channel_name: channelName
+                };
+
+                const result = await apiCall('POST', '/add-list/', data);
+                
+                if (result.status === 'success') {
+                    currentChannel = channelName;
+                    document.getElementById('chatTitle').textContent = `# ${channelName}`;
+                    
+                    // Update active channel in UI
+                    document.querySelectorAll('.channel-item').forEach(item => {
+                        item.classList.remove('active');
+                        if (item.textContent.includes(channelName)) {
+                            item.classList.add('active');
+                        }
+                    });
+
+                    showNotification(`Joined channel: ${channelName}`, 'success');
+                    loadMessages();
+                } else {
+                    throw new Error('Failed to join channel');
+                }
+            } catch (error) {
+                showNotification('Failed to join channel: ' + error.message, 'error');
+            }
+        }
+
+        // Peer Management
+        async function loadPeers() {
+            try {
+                const result = await apiCall('GET', '/get-list/');
+                const peersList = document.getElementById('peersList');
+                peersList.innerHTML = '';
+
+                if (result.peers && result.peers.length > 0) {
+                    result.peers.forEach(peer => {
+                        const item = document.createElement('div');
+                        item.className = 'peer-item';
+                        item.onclick = () => connectToPeer(peer.peer_id, peer.ip, peer.port);
+                        
+                        item.innerHTML = `
+                            <span>👤 ${peer.peer_id}</span>
+                            <span class="peer-badge online">${peer.ip}:${peer.port}</span>
+                        `;
+                        peersList.appendChild(item);
+                    });
+                } else {
+                    peersList.innerHTML = '<div style="padding: 10px; text-align: center; color: #7f8c8d;">No peers online</div>';
+                }
+            } catch (error) {
+                console.error('Failed to load peers:', error);
+            }
+        }
+
+        async function connectToPeer(peerId, ip, port) {
+            try {
+                const data = {
+                    target_peer_id: peerId,
+                    peer_ip: ip,
+                    peer_port: port
+                };
+
+                const result = await apiCall('POST', '/connect-peer/', data);
+                
+                if (result.status === 'success') {
+                    showNotification(`Connected to peer: ${peerId}`, 'success');
+                } else {
+                    throw new Error('Connection failed');
+                }
+            } catch (error) {
+                showNotification('Failed to connect to peer: ' + error.message, 'error');
+            }
+        }
+
+        // Message Management
+        async function loadMessages() {
+            if (!currentChannel) return;
+
+            try {
+                const result = await apiCall('GET', '/send-peer/');
+                const container = document.getElementById('messagesContainer');
+                
+                if (result.messages && result.messages.length > 0) {
+                    container.innerHTML = '';
+                    result.messages.forEach(message => {
+                        displayMessage(message);
+                    });
+                    container.scrollTop = container.scrollHeight;
+                } else if (container.children.length === 1) {
+                    // Keep welcome message if no messages
+                }
+            } catch (error) {
+                console.error('Failed to load messages:', error);
+            }
+        }
+
+        function displayMessage(message) {
+            const container = document.getElementById('messagesContainer');
+            const isOwn = message.from_peer === currentPeerId;
+            
+            const messageEl = document.createElement('div');
+            messageEl.className = `message ${isOwn ? 'own' : ''}`;
+            
+            const avatar = message.from_peer ? message.from_peer[0].toUpperCase() : 'U';
+            const timestamp = new Date(message.timestamp * 1000).toLocaleTimeString();
+            const messageType = message.type || 'direct';
+            
+            messageEl.innerHTML = `
+                <div class="message-avatar">${avatar}</div>
+                <div class="message-content">
+                    <div class="message-header">
+                        <span>${message.from_peer || 'Unknown'}</span>
+                        <span class="message-type ${messageType}">${messageType.toUpperCase()}</span>
+                        <span>${timestamp}</span>
+                    </div>
+                    <div>${message.content || message.message}</div>
+                </div>
+            `;
+            
+            container.appendChild(messageEl);
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const messageText = input.value.trim();
+            
+            if (!messageText || !currentChannel || !isRegistered) {
+                showNotification('Please select a channel and register as peer', 'warning');
+                return;
+            }
+
+            try {
+                const data = {
+                    channel: currentChannel,
+                    message: messageText
+                };
+
+                const result = await apiCall('POST', '/send-peer/', data);
+                
+                if (result.status === 'success') {
+                    input.value = '';
+                    
+                    // Display sent message immediately
+                    displayMessage({
+                        from_peer: currentPeerId,
+                        content: messageText,
+                        timestamp: Date.now() / 1000,
+                        type: 'p2p'
+                    });
+                    
+                    document.getElementById('messagesContainer').scrollTop = 
+                        document.getElementById('messagesContainer').scrollHeight;
+                } else {
+                    throw new Error('Failed to send message');
+                }
+            } catch (error) {
+                showNotification('Failed to send message: ' + error.message, 'error');
+            }
+        }
+
+        async function sendBroadcast() {
+            const messageText = document.getElementById('broadcastMessage').value.trim();
+            
+            if (!messageText || !isRegistered) {
+                showNotification('Please enter message and register as peer', 'warning');
+                return;
+            }
+
+            try {
+                const data = {
+                    message: messageText
+                };
+
+                const result = await apiCall('POST', '/broadcast-peer/', data);
+                
+                if (result.status === 'success') {
+                    hideBroadcastModal();
+                    showNotification('Message broadcasted successfully!', 'success');
+                    document.getElementById('broadcastMessage').value = '';
+                } else {
+                    throw new Error('Broadcast failed');
+                }
+            } catch (error) {
+                showNotification('Failed to broadcast: ' + error.message, 'error');
+            }
+        }
+
+        // UI Functions
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+            
+            event.target.classList.add('active');
+            document.getElementById(tabName + 'Pane').classList.add('active');
+            
+            if (tabName === 'peers') {
+                loadPeers();
+            } else if (tabName === 'channels') {
+                loadChannels();
+            }
+        }
+
+        function updatePeerStatus(status, text) {
+            const indicator = document.getElementById('peerStatus');
+            const statusText = document.getElementById('peerStatusText');
+            
+            indicator.className = `status-indicator ${status}`;
+            statusText.textContent = text;
+        }
+
+        function showCreateChannelModal() {
+            document.getElementById('createChannelModal').classList.add('active');
+            document.getElementById('newChannelName').focus();
+        }
+
+        function hideCreateChannelModal() {
+            document.getElementById('createChannelModal').classList.remove('active');
+            document.getElementById('newChannelName').value = '';
+        }
+
+        function broadcastMessage() {
+            if (!isRegistered) {
+                showNotification('Please register as peer first', 'warning');
+                return;
+            }
+            document.getElementById('broadcastModal').classList.add('active');
+            document.getElementById('broadcastMessage').focus();
+        }
+
+        function hideBroadcastModal() {
+            document.getElementById('broadcastModal').classList.remove('active');
+            document.getElementById('broadcastMessage').value = '';
+        }
+
+        function showNotification(message, type = 'success') {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `notification ${type} show`;
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+
+        function handleMessageKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        function refreshMessages() {
+            loadMessages();
+        }
+
+        function refreshPeers() {
+            loadPeers();
+        }
+
+        // Auto-refresh messages every 3 seconds
+        function startMessagePolling() {
+            setInterval(() => {
+                if (currentChannel && isRegistered) {
+                    loadMessages();
+                }
+            }, 3000);
+            
+            // Auto-refresh peers every 10 seconds
+            setInterval(() => {
+                if (isRegistered) {
+                    loadPeers();
+                }
+            }, 10000);
+        }
+
+        // Close modals when clicking outside
+        document.addEventListener('click', function(event) {
+            if (event.target.classList.contains('modal')) {
+                event.target.classList.remove('active');
+            }
+        });
+    </script>
 </body>
 </html>

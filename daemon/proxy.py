@@ -36,11 +36,16 @@ from .dictionary import CaseInsensitiveDict
 #: A dictionary mapping hostnames to backend IP and port tuples.
 #: Used to determine routing targets for incoming requests.
 PROXY_PASS = {
-    "192.168.56.103:8080": ('192.168.56.103', 9000),
-    "app1.local": ('192.168.56.103', 9001),
-    "app2.local": ('192.168.56.103', 9002),
+    "localhost:8080": ('127.0.0.1', 9000),
+    "127.0.0.1:8080": ('127.0.0.1', 9000),
+    "192.168.1.100:8080": ('192.168.1.100', 9000),  # Replace with your actual local IP
+    "192.168.1.101:8080": ('192.168.1.101', 9000),  # Replace with device 2 IP
+    "app1.local": ('127.0.0.1', 9001),
+    "app2.local": ('127.0.0.1', 9002),
 }
 
+ROUND_ROBIN_COUNTERS = {}######
+ROUTING_LOCK = threading.Lock()#######
 
 def forward_request(host, port, request):
     """
@@ -57,14 +62,20 @@ def forward_request(host, port, request):
     backend = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     try:
+        print("[Proxy] BUILDING: Connecting to backend {}:{}".format(host, port))
         backend.connect((host, port))
-        backend.sendall(request.encode())
+        print("[Proxy] BUILDING: Forwarding request ({} bytes)".format(len(request)))
+        # backend.sendall(request.encode())
+        backend.sendall(request)
+        ##########
+        print("[Proxy] BUILDING: Reading response from backend")
         response = b""
         while True:
             chunk = backend.recv(4096)
             if not chunk:
                 break
             response += chunk
+        print("[Proxy] BUILDING: Received complete response ({} bytes)".format(len(response)))
         return response
     except socket.error as e:
       print("Socket error: {}".format(e))
@@ -88,36 +99,54 @@ def resolve_routing_policy(hostname, routes):
     :params routes (dict): dictionary mapping hostnames and location.
     """
 
-    print(hostname)
+    print("[Proxy] BUILDING: Resolving routing policy for hostname: {}".format(hostname))
     proxy_map, policy = routes.get(hostname,('127.0.0.1:9000','round-robin'))
-    print(proxy_map)
-    print(policy)
+    print("[Proxy] BUILDING: Found proxy_map={}, policy={}".format(proxy_map, policy))
 
     proxy_host = ''
     proxy_port = '9000'
     if isinstance(proxy_map, list):
         if len(proxy_map) == 0:
-            print("[Proxy] Emtpy resolved routing of hostname {}".format(hostname))
-            print ("Empty proxy_map result")
+            print("[Proxy] BUILDING: Empty resolved routing of hostname {}".format(hostname))
+            print("[Proxy] BUILDING: Empty proxy_map result")
             # TODO: implement the error handling for non mapped host
             #       the policy is design by team, but it can be 
             #       basic default host in your self-defined system
-            # Use a dummy host to raise an invalid connection
+            # IMPLEMENTED: Use a default host for invalid connections
+            print("[Proxy] BUILDING: Using default fallback host")
             proxy_host = '127.0.0.1'
             proxy_port = '9000'
         elif len(proxy_map) == 1:
-            proxy_host, proxy_port = proxy_map[0].split(":", 2)
+            print("[Proxy] BUILDING: Single backend found, using direct mapping")
+            proxy_host, proxy_port = proxy_map[0].split(":", 1)  # Fixed split parameter
         #elif: # apply the policy handling 
         #   proxy_map
         #   policy
+        elif policy == 'round-robin':
+            print("[Proxy] BUILDING: Applying round-robin load balancing")
+            with ROUTING_LOCK: # Khóa lại để tránh race condition
+                # Lấy index hiện tại, nếu chưa có thì là 0
+                current_index = ROUND_ROBIN_COUNTERS.get(hostname, 0)
+                
+                # Chọn backend từ danh sách
+                chosen_backend = proxy_map[current_index]
+                
+                # Cập nhật index cho lần sau (quay vòng)
+                next_index = (current_index + 1) % len(proxy_map)
+                ROUND_ROBIN_COUNTERS[hostname] = next_index
+            
+            print("[Proxy] BUILDING: Round-robin for {}: selected backend {}".format(hostname, chosen_backend))
+            proxy_host, proxy_port = chosen_backend.split(":", 1)  # Fixed split parameter
         else:
-            # Out-of-handle mapped host
+            # IMPLEMENTED: Default fallback for unhandled policies
+            print("[Proxy] BUILDING: Using default backend for unhandled policy")
             proxy_host = '127.0.0.1'
             proxy_port = '9000'
     else:
-        print("[Proxy] resolve route of hostname {} is a singulair to".format(hostname))
-        proxy_host, proxy_port = proxy_map.split(":", 2)
+        print("[Proxy] BUILDING: Single backend route for hostname {}".format(hostname))
+        proxy_host, proxy_port = proxy_map.split(":", 1)  # Fixed split parameter
 
+    print("[Proxy] BUILDING: Resolved to {}:{}".format(proxy_host, proxy_port))
     return proxy_host, proxy_port
 
 def handle_client(ip, port, conn, addr, routes):
@@ -139,14 +168,59 @@ def handle_client(ip, port, conn, addr, routes):
     :params routes (dict): dictionary mapping hostnames and location.
     """
 
-    request = conn.recv(1024).decode()
+    # request = conn.recv(1024).decode()
+
+    # # Extract hostname
+    # for line in request.splitlines():
+    #     if line.lower().startswith('host:'):
+    #         hostname = line.split(':', 1)[1].strip()
+    
+    
+    request_data = b""
+    conn.settimeout(1.0)  # Đặt timeout 1 giây để tránh kẹt nếu client giữ kết nối
+    try:
+        while True:
+            chunk = conn.recv(4096)
+            if not chunk:
+                break
+            request_data += chunk
+    except socket.timeout:
+        pass  # Coi như đã nhận xong
+
+    # Nếu không nhận được gì, đóng kết nối
+    if not request_data:
+        print("[Proxy] Empty request from {}".format(addr))
+        conn.close()
+        return
+
+    # Giải mã string chỉ để đọc header (dùng 'ignore' để tránh lỗi utf-8)
+    request_string = request_data.decode('utf-8', errors='ignore')
 
     # Extract hostname
-    for line in request.splitlines():
+    hostname = "" # Khởi tạo
+    for line in request_string.splitlines():
         if line.lower().startswith('host:'):
             hostname = line.split(':', 1)[1].strip()
+            break # Tìm thấy rồi thì dừng
 
-    if hostname: print("[Proxy] {} at Host: {}".format(addr, hostname))
+    # Nếu không tìm thấy header 'Host' -> Lỗi 400 Bad Request
+    if not hostname:
+        print("[Proxy] No Host header from {}".format(addr))
+        response = (
+            "HTTP/1.1 400 Bad Request\r\n"
+            "Content-Type: text/plain\r\n"
+            "Content-Length: 15\r\n"
+            "Connection: close\r\n"
+            "\r\n"
+            "400 Bad Request"
+        ).encode('utf-8')
+        conn.sendall(response)
+        conn.close()
+        return
+    # ##########
+    
+
+    print("[Proxy] {} at Host: {}".format(addr, hostname))
 
     # Resolve the matching destination in routes and need conver port
     # to integer value
@@ -158,7 +232,7 @@ def handle_client(ip, port, conn, addr, routes):
 
     if resolved_host:
         print("[Proxy] Host name {} is forwarded to {}:{}".format(hostname,resolved_host, resolved_port))
-        response = forward_request(resolved_host, resolved_port, request)        
+        response = forward_request(resolved_host, resolved_port, request_data)        
     else:
         response = (
             "HTTP/1.1 404 Not Found\r\n"
@@ -195,10 +269,17 @@ def run_proxy(ip, port, routes):
         while True:
             conn, addr = proxy.accept()
             #
+            #  TODO: implement the step of the client incomping connection
+            #        using multi-thread programming with the
+            #        provided handle_client routine
+            #
             client_thread = threading.Thread(target=handle_client, args=(ip,port,conn, addr, routes))
             client_thread.daemon = True 
             client_thread.start()
-            #
+            # 
+            # 
+            # 
+
     except socket.error as e:
       print("Socket error: {}".format(e))
 

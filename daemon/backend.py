@@ -98,7 +98,7 @@ def run_backend(ip, port, routes):
             thread.daemon = True   # Thread tự kết thúc khi server tắt
             thread.start()
     except socket.error as e:
-      print("Socket error: {}".format(e))
+        print("Socket error: {}".format(e))
 
 def create_backend(ip, port, routes={}):
     """

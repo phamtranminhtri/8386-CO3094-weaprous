@@ -23,6 +23,8 @@ Request and Response objects to handle client-server communication.
 from .request import Request
 from .response import Response
 from .dictionary import CaseInsensitiveDict
+from .api_handlers import APIHandlers
+import json
 
 class HttpAdapter:
     """
@@ -106,6 +108,21 @@ class HttpAdapter:
         msg = conn.recv(1024).decode()
         req.prepare(msg, routes)
 
+        # Handle API routes
+        if self.handle_api_routes(req, resp, conn):
+            return  # API handler sent response, exit early
+
+        # Handle authentication-specific routes
+        if self.handle_authentication_routes(req, resp, conn):
+            return  # Authentication handler sent response, exit early
+
+        # Check authentication for protected routes (GET /)
+        if req.method == 'GET' and req.path in ['/', '/index.html']:
+            if not self.check_authentication_cookie(req):
+                print("[HttpAdapter] BUILDING: Access denied - no valid auth cookie")
+                self.send_unauthorized_response(conn)
+                return
+
         # Handle request hook
         if req.hook:
             print("[HttpAdapter] hook in route-path METHOD {} PATH {}".format(req.hook._route_path,req.hook._route_methods))
@@ -121,7 +138,145 @@ class HttpAdapter:
         conn.sendall(response)
         conn.close()
 
-    @property
+    def handle_authentication_routes(self, req, resp, conn):
+        """Handle authentication-specific routes like /login."""
+        if req.method == 'POST' and req.path == '/login':
+            print("[HttpAdapter] BUILDING: Processing login request")
+            
+            # Parse form data from body
+            form_data = req.parse_form_data(req.body)
+            username = form_data.get('username', '')
+            password = form_data.get('password', '')
+            
+            print("[HttpAdapter] BUILDING: Login attempt - username: {}".format(username))
+            
+            # Validate credentials
+            if username == 'admin' and password == 'password':
+                print("[HttpAdapter] BUILDING: Valid credentials - sending success response")
+                self.send_login_success_response(conn)
+            else:
+                print("[HttpAdapter] BUILDING: Invalid credentials - sending unauthorized response")
+                self.send_unauthorized_response(conn)
+            
+            return True  # Handled the request
+        
+        return False  # Didn't handle this request
+
+    def check_authentication_cookie(self, req):
+        """Check if the request has valid authentication cookie."""
+        if hasattr(req, 'cookies') and req.cookies:
+            auth_cookie = req.cookies.get('auth', '')
+            return auth_cookie == 'true'
+        return False
+
+    def send_login_success_response(self, conn):
+        """Send successful login response with Set-Cookie header."""
+        try:
+            # Read the index.html file
+            with open('www/index.html', 'r') as f:
+                content = f.read()
+            
+            response = (
+                "HTTP/1.1 200 OK\r\n"
+                "Content-Type: text/html\r\n" 
+                "Content-Length: {}\r\n"
+                "Set-Cookie: auth=true; Path=/\r\n"
+                "Connection: close\r\n"
+                "\r\n"
+                "{}"
+            ).format(len(content), content)
+            
+            conn.sendall(response.encode())
+            print("[HttpAdapter] BUILDING: Sent login success response with auth cookie")
+        except FileNotFoundError:
+            # Fallback if index.html not found
+            content = "<html><body><h1>Login Successful</h1><p>Welcome, admin!</p></body></html>"
+            response = (
+                "HTTP/1.1 200 OK\r\n"
+                "Content-Type: text/html\r\n"
+                "Content-Length: {}\r\n" 
+                "Set-Cookie: auth=true; Path=/\r\n"
+                "Connection: close\r\n"
+                "\r\n"
+                "{}"
+            ).format(len(content), content)
+            conn.sendall(response.encode())
+        finally:
+            conn.close()
+
+    def send_unauthorized_response(self, conn):
+        """Send 401 Unauthorized response."""
+        content = (
+            "<html><body>"
+            "<h1>401 Unauthorized</h1>"
+            "<p>Access denied. Please login first.</p>"
+            "<form method='POST' action='/login'>"
+            "<p>Username: <input name='username' type='text' value='admin'></p>"
+            "<p>Password: <input name='password' type='password' value='password'></p>"
+            "<p><input type='submit' value='Login'></p>"
+            "</form>"
+            "</body></html>"
+        )
+        
+        response = (
+            "HTTP/1.1 401 Unauthorized\r\n"
+            "Content-Type: text/html\r\n"
+            "Content-Length: {}\r\n" 
+            "Connection: close\r\n"
+            "\r\n"
+            "{}"
+        ).format(len(content), content)
+        
+        conn.sendall(response.encode())
+        conn.close()
+        print("[HttpAdapter] BUILDING: Sent 401 Unauthorized response")
+
+    def handle_api_routes(self, req, resp, conn):
+        """Handle API endpoints."""
+        api_paths = ['/login/', '/submit-info/', '/add-list/', '/get-list/', 
+                    '/connect-peer/', '/broadcast-peer/', '/send-peer/']
+        
+        if any(req.path.startswith(api_path) for api_path in api_paths):
+            print("[HttpAdapter] BUILDING: Processing API request to {}".format(req.path))
+            
+            # Call API handler
+            status_code, response_headers, response_data = APIHandlers.handle_api_request(
+                req.method, req.path, req.headers, req.body, req.cookies
+            )
+            
+            # Send JSON response
+            json_response = json.dumps(response_data, indent=2)
+            
+            # Build headers
+            headers = {
+                "Content-Type": "application/json",
+                "Content-Length": str(len(json_response)),
+                "Connection": "close"
+            }
+            headers.update(response_headers)  # Add any additional headers
+            
+            # Build HTTP response
+            status_text = {
+                200: "OK",
+                400: "Bad Request", 
+                401: "Unauthorized",
+                404: "Not Found",
+                405: "Method Not Allowed"
+            }.get(status_code, "Internal Server Error")
+            
+            response = "HTTP/1.1 {} {}\r\n".format(status_code, status_text)
+            for key, value in headers.items():
+                response += "{}: {}\r\n".format(key, value)
+            response += "\r\n"
+            response += json_response
+            
+            conn.sendall(response.encode())
+            conn.close()
+            print("[HttpAdapter] BUILDING: Sent API response with status {}".format(status_code))
+            return True
+        
+        return False
+
     def extract_cookies(self, req, resp):
         """
         Build cookies from the :class:`Request <Request>` headers.
@@ -130,14 +285,14 @@ class HttpAdapter:
         :param resp: (Response) The res:class:`Response <Response>` object.
         :rtype: cookies - A dictionary of cookie key-value pairs.
         """
-        headers = getattr(req, "headers", {})
         cookies = {}
-        for header in headers:
-            if header.startswith("Cookie:"):
-                cookie_str = header.split(":", 1)[1].strip()
-                for pair in cookie_str.split(";"):
-                    key, value = pair.strip().split("=")
-                    cookies[key] = value
+        if hasattr(req, 'headers') and req.headers:
+            cookie_header = req.headers.get('cookie', '')
+            if cookie_header:
+                for pair in cookie_header.split(";"):
+                    if '=' in pair:
+                        key, value = pair.strip().split("=", 1)
+                        cookies[key] = value
         return cookies
 
     def build_response(self, req, resp):
@@ -149,18 +304,20 @@ class HttpAdapter:
         """
         response = Response()
 
-        # Set encoding.
-        response.encoding = self.get_encoding_from_headers(response.headers)
+        # Set basic properties
+        response.encoding = 'utf-8'  # Default encoding
         response.raw = resp
-        response.reason = response.raw.reason
+        if hasattr(resp, 'reason'):
+            response.reason = resp.reason
 
-        if isinstance(req.url, bytes):
-            response.url = req.url.decode("utf-8")
-        else:
-            response.url = req.url
+        if hasattr(req, 'url') and req.url:
+            if isinstance(req.url, bytes):
+                response.url = req.url.decode("utf-8")
+            else:
+                response.url = req.url
 
         # Add new cookies from the server.
-        response.cookies = self.extract_cookies(req)
+        response.cookies = self.extract_cookies(req, resp)
 
         # Give the Response some context.
         response.request = req
