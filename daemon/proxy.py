@@ -217,7 +217,7 @@ def run_proxy(ip, port, routes):
             # thread.join()
             # handle_client(ip, port, conn, addr, routes)
     except socket.error as e:
-      print("Socket error: {}".format(e))
+        print("Socket error: {}".format(e))
 
 def create_proxy(ip, port, routes):
     """

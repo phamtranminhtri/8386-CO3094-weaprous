@@ -88,7 +88,7 @@ class Response():
         self._next = None
 
         #: Integer Code of responded HTTP Status, e.g. 404 or 200.
-        self.status_code = None
+        self.status_code = 200  # Default to 200 OK
 
         #: Case-insensitive Dictionary of Response Headers.
         #: For example, ``headers['content-type']`` will return the
@@ -118,6 +118,17 @@ class Response():
         #: is a response.
         self.request = None
 
+    def set_status_code(self, code):
+        """Set the HTTP status code for the response."""
+        self.status_code = code
+    
+    def is_success(self):
+        """Check if response is successful (2xx status codes)."""
+        return 200 <= self.status_code < 300
+    
+    def is_error(self):
+        """Check if response has error status (4xx or 5xx)."""
+        return self.status_code >= 400
 
     def get_mime_type(self, path):
         """
@@ -199,13 +210,16 @@ class Response():
         try:
             with open(filepath, 'rb') as f:
                 content = f.read()
+                return len(content), content
         except FileNotFoundError:
+            self.set_status_code(404)
             content = b"404 Not Found"
+            return len(content), content
         except Exception as e:
             print(f"[Response] Error reading file: {e}")
+            self.set_status_code(500)
             content = b"500 Internal Server Error"
-            
-        return len(content), content
+            return len(content), content
 
 
     def build_response_header(self, request):
@@ -244,8 +258,22 @@ class Response():
         if request.method == "POST" and request.path == "/login":
             headers["Set-Cookie"] = "auth=true"
 
-        # Header text alignment
-        fmt_header = "HTTP/1.1 200 OK\r\n"
+        # Get status message based on status code
+        status_messages = {
+            200: "OK",
+            201: "Created", 
+            302: "Found",
+            400: "Bad Request",
+            401: "Unauthorized",
+            403: "Forbidden",
+            404: "Not Found",
+            500: "Internal Server Error"
+        }
+        
+        status_message = status_messages.get(self.status_code, "OK")
+        
+        # Header text alignment with dynamic status code
+        fmt_header = f"HTTP/1.1 {self.status_code} {status_message}\r\n"
         for key, value in headers.items():
             fmt_header += f"{key}: {value}\r\n"
         fmt_header += "\r\n"
@@ -259,16 +287,20 @@ class Response():
 
         :rtype bytes: Encoded 404 response.
         """
-
+        
+        self.set_status_code(404)
+        content = "404 Not Found"
+        content_length = len(content.encode('utf-8'))
+        
         return (
                 "HTTP/1.1 404 Not Found\r\n"
                 "Accept-Ranges: bytes\r\n"
                 "Content-Type: text/html\r\n"
-                "Content-Length: 13\r\n"
+                f"Content-Length: {content_length}\r\n"
                 "Cache-Control: max-age=86000\r\n"
                 "Connection: close\r\n"
                 "\r\n"
-                "404 Not Found"
+                f"{content}"
             ).encode('utf-8')
 
 
@@ -278,17 +310,20 @@ class Response():
 
         :rtype bytes: Encoded 401 response.
         """
-
+        
+        self.set_status_code(401)
+        content = "401 Unauthorized<br><a href='/login'>Login</a> or <a href='/register'>Register</a>\r\n"
+        content_length = len(content.encode('utf-8'))
+        
         return (
                 "HTTP/1.1 401 Unauthorized\r\n"
                 # "WWW-Authenticate: Basic realm=\"Access to the site\"\r\n"
                 "Content-Type: text/html\r\n"
-                # "Content-Length: 16\r\n"
+                f"Content-Length: {content_length}\r\n"
                 "Cache-Control: no-cache\r\n"
                 "Connection: close\r\n"
                 "\r\n"
-                "401 Unauthorized<br>"
-                "<a href='/login'>Login</a> or <a href='/register'>Register</a>\r\n"
+                f"{content}"
             ).encode('utf-8')
 
 
@@ -300,7 +335,8 @@ class Response():
 
         :rtype bytes: Encoded 302 redirect response.
         """
-
+        
+        self.set_status_code(302)
         redirect_message = f"Redirecting to {path}"
         content_length = len(redirect_message)
 
@@ -345,28 +381,48 @@ class Response():
 
 
     def build_content_placeholder(self, req, html_content, placeholders):
-        html_path = os.path.join("www", html_content)
-        with open(html_path) as f:
-            raw_html = f.read()
-        for i, placeholder in enumerate(placeholders):
-            raw_html = raw_html.replace(f"{{{{ placeholder_{i} }}}}", placeholder)
+        try:
+            html_path = os.path.join("www", html_content)
+            with open(html_path) as f:
+                raw_html = f.read()
+            for i, placeholder in enumerate(placeholders):
+                raw_html = raw_html.replace(f"{{{{ placeholder_{i} }}}}", placeholder)
 
-        # Convert HTML to bytes
-        content = raw_html.encode('utf-8')
-        content_length = len(content)
+            # Convert HTML to bytes
+            content = raw_html.encode('utf-8')
+            content_length = len(content)
+            
+            # Set successful status code
+            self.set_status_code(200)
 
-        # Build response header
-        response_header = (
-            "HTTP/1.1 200 OK\r\n"
-            "Content-Type: text/html; charset=utf-8\r\n"
-            f"Content-Length: {content_length}\r\n"
-            f"Date: {datetime.datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT')}\r\n"
-            "Cache-Control: no-cache\r\n"
-            "Connection: close\r\n"
-            "\r\n"
-        ).encode('utf-8')
+            # Build response header
+            response_header = (
+                "HTTP/1.1 200 OK\r\n"
+                "Content-Type: text/html; charset=utf-8\r\n"
+                f"Content-Length: {content_length}\r\n"
+                f"Date: {datetime.datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT')}\r\n"
+                "Cache-Control: no-cache\r\n"
+                "Connection: close\r\n"
+                "\r\n"
+            ).encode('utf-8')
 
-        return response_header + content
+            return response_header + content
+            
+        except FileNotFoundError:
+            self.set_status_code(404)
+            return self.build_notfound()
+        except Exception as e:
+            print(f"[Response] Error in build_content_placeholder: {e}")
+            self.set_status_code(500)
+            content = "500 Internal Server Error"
+            return (
+                "HTTP/1.1 500 Internal Server Error\r\n"
+                "Content-Type: text/html\r\n"
+                f"Content-Length: {len(content)}\r\n"
+                "Connection: close\r\n"
+                "\r\n"
+                f"{content}"
+            ).encode('utf-8')
 
 
     def build_response(self, request):
@@ -401,9 +457,15 @@ class Response():
         elif mime_type in ['text/plain', 'text/csv', 'text/xml']:
             base_dir = self.prepare_content_type(mime_type = mime_type)
         else:
+            self.set_status_code(404)
             return self.build_notfound()
 
         c_len, self._content = self.build_content(path, base_dir)
+        
+        # If file not found during content loading, return 404
+        if self.status_code == 404:
+            return self.build_notfound()
+            
         self._header = self.build_response_header(request)
 
         return self._header + self._content
