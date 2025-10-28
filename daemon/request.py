@@ -69,17 +69,40 @@ class Request():
         self.hook = None
 
     def extract_request_line(self, request):
+        """
+        Extract HTTP method, path, and version from request line.
+        
+        Args:
+            request: Raw HTTP request string
+            
+        Returns:
+            tuple: (method, path, version) or (None, None, None) on error
+        """
         try:
             lines = request.splitlines()
+            if not lines:
+                print("[Request] Error: Empty request")
+                return None, None, None
+                
             first_line = lines[0]
-            method, path, version = first_line.split()
-
-            # if path == '/':
-            #     path = '/index.html'
-        except Exception:
-            return None, None
-
-        return method, path, version
+            parts = first_line.split()
+            
+            if len(parts) != 3:
+                print(f"[Request] Error: Invalid request line format: {first_line}")
+                return None, None, None
+                
+            method, path, version = parts
+            
+            # Basic validation
+            if not method or not path or not version:
+                print(f"[Request] Error: Missing components in request line: {first_line}")
+                return None, None, None
+                
+            return method, path, version
+            
+        except Exception as e:
+            print(f"[Request] Error parsing request line: {e}")
+            return None, None, None
              
     def prepare_headers(self, request):
         """Prepares the given HTTP headers."""
@@ -96,6 +119,12 @@ class Request():
 
         # Prepare the request line from the request header
         self.method, self.path, self.version = self.extract_request_line(request)
+        
+        # Handle malformed requests
+        if self.method is None or self.path is None or self.version is None:
+            print("[Request] Error: Failed to parse request line")
+            return None
+            
         print("[Request] {} path {} version {}".format(self.method, self.path, self.version))
 
         #
@@ -120,6 +149,11 @@ class Request():
             raw_body = parts[1]
 
         self.headers = self.prepare_headers(raw_header)
+        
+        # Validate Content-Length before processing body
+        self.prepare_content_length(raw_body)
+        
+        # Process body based on content type
         self.body = self.prepare_body(raw_body)
 
         cookies = self.headers.get('cookie', '')
@@ -130,43 +164,84 @@ class Request():
         return
 
     def prepare_body(self, data, files=None, json=None):
-        body = None
-        if not data:
-            return body
-
-        content_type = self.headers.get('content-type', '')
-        if content_type == "application/x-www-form-urlencoded":
-            list_of_tuples = urllib.parse.parse_qsl(data)
-            body = dict(list_of_tuples)
+        """
+        Prepares the request body based on content type.
         
-        # if json is not None:
-        #     import json as json_module
-        #     body = json_module.dumps(json).encode('utf-8')
-        #     self.headers['Content-Type'] = 'application/json'
-        # elif data:
-        #     if isinstance(data, dict):
-        #         body = '&'.join([f"{k}={v}" for k, v in data.items()]).encode('utf-8')
-        #         self.headers['Content-Type'] = 'application/x-www-form-urlencoded'
-        #     elif isinstance(data, str):
-        #         body = data.encode('utf-8')
-        #     else:
-        #         body = data
-        # elif files:
-        #     # Simple file handling - in production would use multipart/form-data
-        #     body = b''
+        Args:
+            data: Raw body data from HTTP request
+            files: File data (future use)
+            json: JSON data (future use)
             
-        # self.body = body
-        self.prepare_content_length(data)
+        Returns:
+            Processed body data appropriate for the content type
+        """
+        if not data:
+            return None
+
+        content_type = self.headers.get('content-type', '').lower()
         
-        return body
+        # Handle different content types
+        if content_type == "application/x-www-form-urlencoded":
+            # Parse URL-encoded form data into dictionary
+            try:
+                list_of_tuples = urllib.parse.parse_qsl(data)
+                return dict(list_of_tuples)
+            except Exception as e:
+                print(f"[Request] Error parsing form data: {e}")
+                return data
+                
+        elif content_type.startswith("application/json"):
+            # Parse JSON data
+            try:
+                import json as json_module
+                return json_module.loads(data)
+            except Exception as e:
+                print(f"[Request] Error parsing JSON: {e}")
+                return data
+                
+        elif content_type.startswith("multipart/form-data"):
+            # For now, return raw data - could be enhanced for file uploads
+            print("[Request] Multipart form data detected, returning raw data")
+            return data
+            
+        elif content_type.startswith("text/"):
+            # Handle text data (plain, html, etc.)
+            return data
+            
+        else:
+            # For any other content type, return raw data
+            print(f"[Request] Unknown content type '{content_type}', returning raw data")
+            return data
 
 
     def prepare_content_length(self, body):
-        """Prepares the Content-Length header based on body size."""
+        """
+        Validates Content-Length header against actual body size.
+        Does NOT override client's Content-Length header.
+        
+        Args:
+            body: The raw body data to validate against
+        """
         if body is not None:
-            self.headers["Content-Length"] = str(len(body))
+            actual_length = len(body)
+            client_length = self.headers.get("content-length")
+            
+            if client_length:
+                try:
+                    client_length = int(client_length)
+                    if client_length != actual_length:
+                        print(f"[Request] Warning: Content-Length mismatch. "
+                              f"Client sent {client_length}, actual is {actual_length}")
+                except ValueError:
+                    print(f"[Request] Warning: Invalid Content-Length header: {client_length}")
+            else:
+                # Only set Content-Length if client didn't provide it
+                print(f"[Request] No Content-Length provided by client, setting to {actual_length}")
+                self.headers["content-length"] = str(actual_length)
         else:
-            self.headers["Content-Length"] = "0"
+            # Only set to 0 if no Content-Length header exists
+            if "content-length" not in self.headers:
+                self.headers["content-length"] = "0"
         
         return
 
