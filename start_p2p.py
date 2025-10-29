@@ -60,13 +60,17 @@ def connect_peer_get(headers, body):
 
 if __name__ == "__main__":
     # Parse command-line arguments to configure server IP and port
-    parser = argparse.ArgumentParser(prog='Backend', description='', epilog='Beckend daemon')
+    parser = argparse.ArgumentParser(prog='P2P Chat', description='Peer-to-peer chat application', epilog='P2P daemon')
     parser.add_argument('--server-ip', default='127.0.0.1')
     parser.add_argument('--server-port', type=int, default=PORT)
+    parser.add_argument('--peer-listen-port', type=int, default=PORT + 1000, 
+                        help='Port to listen for incoming peer messages')
  
     args = parser.parse_args()
     ip = args.server_ip
     port = args.server_port
+    peer_listen_port = args.peer_listen_port
+
 
     # Prepare and launch the RESTful application
     app.prepare_address(ip, port)
