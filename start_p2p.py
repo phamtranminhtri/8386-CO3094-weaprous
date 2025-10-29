@@ -14,7 +14,7 @@
 
 
 """
-start_app
+start_p2p
 ~~~~~~~~~~~~~~~~~
 """
 
@@ -26,12 +26,33 @@ import random
 
 from daemon.weaprous import WeApRous
 
-PORT = 8000  # Default port
+PORT = 8386  # Default port
 
 app = WeApRous()
 accounts = dict()
 session_to_account = dict()
 account_to_address = dict()
+server_ip = ""
+server_port = ""
+
+
+@app.route('/connect-peer', methods=['POST'])
+def connect_peer_post(headers, body):
+    print(f"[App] connect_peer_post with\nHeader: {headers}\nBody: {body}")
+    global server_ip
+    server_ip = body.get("server-ip", "")
+    global server_port
+    server_port = body.get("server-port", "")
+
+    return {"auth": "true", "redirect": "/connect-peer"}
+    
+
+
+@app.route('/connect-peer', methods=['GET'])
+def connect_peer_get(headers, body):
+    print(f"[App] connect_peer_get with\nHeader: {headers}\nBody: {body}")
+
+    return {"auth": "true", "content": "sample.html", "placeholder": (server_ip, server_port)}
 
 
 @app.route('/login', methods=['POST'])
@@ -141,27 +162,8 @@ def get_list(headers, body):
         return {"auth": "false"}
     
     html_list_string = ""
-    current_username = get_username(headers)
     for username, (user_ip, user_port) in account_to_address.items():
-        html_list_item = f"""
-            <li>
-            <b>{username}</b>'s address: [ {user_ip}:{user_port} ]
-        """
-        if username != current_username:
-            html_list_item += f"""
-                <form method="POST" action="http://127.0.0.1:8386/connect-peer">
-                    <input type="hidden" name="ip" value="{user_ip}">
-                    <input type="hidden" name="port" value="{user_port}">
-                    <input type="hidden" name="server-ip" value="{app.ip}">
-                    <input type="hidden" name="server-port" value="{app.port}">
-                    <input type="submit" value="Chat with {username}">
-                </form>
-            """
-        html_list_item += "</li>"
-        html_list_string += html_list_item
-
-    if current_username not in account_to_address:
-        html_list_string = "You need to submit a address (IP + port) before chatting."
+        html_list_string += f"<li><b>{username}</b>'s address: [ {user_ip}:{user_port} ]</li>\r\n"
 
     return {"auth": "true", "content": "get-list.html", "placeholder": (html_list_string,)}
 
@@ -215,7 +217,7 @@ def validate_address(ip, port):
 if __name__ == "__main__":
     # Parse command-line arguments to configure server IP and port
     parser = argparse.ArgumentParser(prog='Backend', description='', epilog='Beckend daemon')
-    parser.add_argument('--server-ip', default='0.0.0.0')
+    parser.add_argument('--server-ip', default='127.0.0.1')
     parser.add_argument('--server-port', type=int, default=PORT)
  
     args = parser.parse_args()
@@ -224,5 +226,5 @@ if __name__ == "__main__":
 
     # Prepare and launch the RESTful application
     app.prepare_address(ip, port)
-    # app.run()
-    app.run_proxy()
+    app.run()
+    # app.run_proxy()
