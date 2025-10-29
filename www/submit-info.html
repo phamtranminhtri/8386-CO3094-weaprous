@@ -1,9 +1,14 @@
 <html><body>
 <h1>Submit info</h1>
-Submit your IP and port to start chatting.
+Submit your chatting IP+port, and your local port (start_p2p.py) to start chatting.
+<ul>
+  <li>Chatting IP+port: Socket that other peer will use to send messages to (example 192.168.1.55:12345)</li>
+  <li>Local port: Port that peer's local python script (start_p2p.py) is listening to HTTP request from peer's browser (example 127.0.0.1:8386, the local address is fixed to 127.0.0.1)</li>
+</ul>
 <form method="POST" action="/submit-info">
-  IP: <input name="ip" type="text"><br>
-  Port: <input name="port" type="number"><br>
+  Chatting IP: <input name="ip" type="text"><br>
+  Chatting Port: <input name="port" type="number"><br>
+  Local Port: <input name="local-port" type="number"><br>
   <input type="submit" value="Send">
 </form>
 <a href="/">Back to index</a>

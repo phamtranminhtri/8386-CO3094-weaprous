@@ -97,8 +97,8 @@ def index(headers, body):
         return {"auth": "false"}
     
     username = get_username(headers)
-    user_ip, user_port = account_to_address.get(username, (None, None))
-    if user_ip and user_port:
+    user_ip, user_port, user_local_port = account_to_address.get(username, (None, None, None))
+    if user_ip and user_port and user_local_port:
         address_noti_message = f"Your submitted chatting address is [ {user_ip}:{user_port} ]."
     else:
         address_noti_message = "You need to submit a address (IP + port) before chatting."
@@ -110,9 +110,9 @@ def index(headers, body):
 def submit_post(headers, body):
     print(f"[App] submit_post with\nHeader: {headers}\nBody: {body}")
 
-    user_ip, user_port = body["ip"], body["port"]
+    user_ip, user_port, user_local_port = body["ip"], body["port"], body["local-port"]
     
-    if not validate_address(user_ip, user_port):
+    if not validate_address(user_ip, user_port, user_local_port):
         return {"auth": "true", "redirect": "/submit-info"}
 
     if not authenticate(headers):
@@ -122,7 +122,7 @@ def submit_post(headers, body):
     if not username:
         return {"auth": "false"}
     
-    account_to_address[username] = (user_ip, int(user_port))
+    account_to_address[username] = (user_ip, int(user_port), int(user_local_port))
     return {"auth": "true", "redirect": "/"}
 
 
@@ -142,14 +142,14 @@ def get_list(headers, body):
     
     html_list_string = ""
     current_username = get_username(headers)
-    for username, (user_ip, user_port) in account_to_address.items():
+    for username, (user_ip, user_port, user_local_port) in account_to_address.items():
         html_list_item = f"""
             <li>
             <b>{username}</b>'s address: [ {user_ip}:{user_port} ]
         """
         if username != current_username:
             html_list_item += f"""
-                <form method="POST" action="http://127.0.0.1:8386/connect-peer">
+                <form method="POST" action="http://127.0.0.1:{user_local_port}/connect-peer">
                     <input type="hidden" name="ip" value="{user_ip}">
                     <input type="hidden" name="port" value="{user_port}">
                     <input type="hidden" name="server-ip" value="{app.ip}">
@@ -186,7 +186,7 @@ def get_username(headers):
     return None
 
 
-def validate_address(ip, port):
+def validate_address(ip, port, local_port):
     parts = ip.split(".")
 
     if len(parts) != 4:
@@ -202,11 +202,11 @@ def validate_address(ip, port):
             return False
         
     try:
-        port = int(port)
+        port, local_port = int(port), int(local_port)
     except ValueError:
         return False
 
-    if port < 0 or port > 65535:
+    if port < 0 or port > 65535 or local_port < 0 or local_port > 65535:
         return False
     
     return True
