@@ -292,7 +292,11 @@ def chat_get(headers, body):
     peer_port = headers["query"]["port"]
     peer_address = f"{peer_ip}:{peer_port}"
     history = chat_history.get(peer_address, "No history")
-    return {"auth": "true", "content": "chat.html", "placeholder": (peer_address, str(history), peer_ip, peer_port)}
+    return {
+        "auth": "true", 
+        "content": "chat.html", 
+        "placeholder": (peer_address, str(history), peer_ip, peer_port, server_ip, str(server_port))
+    }
 
 
 @app.route('/chat', methods=['POST'])
