@@ -157,7 +157,6 @@ def get_list(headers, body):
                     <input type="hidden" name="server-port" value="{app.port}">
                     <input type="submit" value="Chat with {username}">
                 </form>
-                <a href="http://127.0.0.1:{current_user_local_port}/chat?ip={user_ip}&port={user_port}">Chat</a>
             """
         html_list_item += "</li>"
         html_list_string += html_list_item
