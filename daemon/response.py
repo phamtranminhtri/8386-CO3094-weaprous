@@ -304,44 +304,36 @@ class Response():
         redirect_message = f"Redirecting to {path}"
         content_length = len(redirect_message)
 
+        # ✅ SỬA: Tạo response chung, sau đó thêm cookie tùy case
+        base_response = (
+            "HTTP/1.1 302 Found\r\n"
+            f"Location: {path}\r\n"
+            "Content-Type: text/html; charset=utf-8\r\n"
+            f"Content-Length: {content_length}\r\n"
+            "Cache-Control: no-cache\r\n"
+            "Connection: close\r\n"
+        )
+
+        # ✅ SỬA: Chỉ set cookie khi có session_id
         if request.method == "POST" and request.path in ["/login", "/register"]:
-            return (
-                "HTTP/1.1 302 Found\r\n"
-                f"Location: {path}\r\n"
-                "Content-Type: text/html\r\n"
-                f"Content-Length: {content_length}\r\n"
-                "Cache-Control: no-cache\r\n"
-                "Connection: close\r\n"
-                f"Set-Cookie: auth=true; Path=/\r\n"
-                f"Set-Cookie: session_id={new_session_id}; Path=/\r\n"
-                "\r\n"
-                f"{redirect_message}"
-            ).encode('utf-8')
+            if new_session_id:
+                base_response += f"Set-Cookie: auth=true; Path=/; HttpOnly\r\n"
+                base_response += f"Set-Cookie: session_id={new_session_id}; Path=/; HttpOnly\r\n"
+            base_response += "\r\n"
+            base_response += redirect_message
+            return base_response.encode('utf-8')
 
         if request.method == "POST" and request.path == "/logout":
-            return (
-                "HTTP/1.1 302 Found\r\n"
-                f"Location: {path}\r\n"
-                "Content-Type: text/html\r\n"
-                f"Content-Length: {content_length}\r\n"
-                "Cache-Control: no-cache\r\n"
-                "Connection: close\r\n"
-                f"Set-Cookie: auth=false; Path=/\r\n"
-                "\r\n"
-                f"{redirect_message}"
-            ).encode('utf-8')
-        
+            base_response += "Set-Cookie: auth=false; Path=/; Max-Age=0\r\n"
+            base_response += "Set-Cookie: session_id=; Path=/; Max-Age=0\r\n"
+            base_response += "\r\n"
+            base_response += redirect_message
+            return base_response.encode('utf-8')
 
-        return (
-                "HTTP/1.1 302 Found\r\n"
-                f"Location: {path}\r\n"
-                "Content-Type: text/html\r\n"
-                f"Content-Length: {content_length}\r\n"
-                "Cache-Control: no-cache\r\n"
-                "Connection: close\r\n"
-                "\r\n"
-                f"{redirect_message}"
-            ).encode('utf-8')
+        # Default redirect (không set cookie)
+        base_response += "\r\n"
+        base_response += redirect_message
+        return base_response.encode('utf-8')
 
 
     def build_content_placeholder(self, req, html_content, placeholders):
