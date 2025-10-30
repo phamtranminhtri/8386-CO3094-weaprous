@@ -96,6 +96,16 @@ class Request():
 
         # Prepare the request line from the request header
         self.method, self.path, self.version = self.extract_request_line(request)
+        # Initialize query container
+        self.query = {}
+        # If there's a query string, split it off and parse into a dict
+        if "?" in self.path:
+            path_part, query_string = self.path.split("?", 1)
+            # keep a sensible default path
+            self.path = path_part or "/"
+            # parse_qsl returns list of (key, value) pairs; build dict (last value wins)
+            self.query = dict(urllib.parse.parse_qsl(query_string, keep_blank_values=True, encoding='utf-8', errors='replace'))
+
         print("[Request] {} path {} version {}".format(self.method, self.path, self.version))
 
         #
@@ -126,6 +136,9 @@ class Request():
         
         if cookies:
             self.prepare_cookies(cookies)
+
+        # Update query into self.headers
+        self.headers["query"] = self.query
 
         return
 

@@ -142,20 +142,22 @@ def get_list(headers, body):
     
     html_list_string = ""
     current_username = get_username(headers)
-    for username, (user_ip, user_port, user_local_port) in account_to_address.items():
+    _, _, current_user_local_port = account_to_address[current_username]
+    for username, (user_ip, user_port, _) in account_to_address.items():
         html_list_item = f"""
             <li>
             <b>{username}</b>'s address: [ {user_ip}:{user_port} ]
         """
         if username != current_username:
             html_list_item += f"""
-                <form method="POST" action="http://127.0.0.1:{user_local_port}/connect-peer">
-                    <input type="hidden" name="ip" value="{user_ip}">
-                    <input type="hidden" name="port" value="{user_port}">
+                <form method="POST" action="http://127.0.0.1:{current_user_local_port}/connect-peer">
+                    <input type="hidden" name="peer-ip" value="{user_ip}">
+                    <input type="hidden" name="peer-port" value="{user_port}">
                     <input type="hidden" name="server-ip" value="{app.ip}">
                     <input type="hidden" name="server-port" value="{app.port}">
                     <input type="submit" value="Chat with {username}">
                 </form>
+                <a href="http://127.0.0.1:{current_user_local_port}/chat?ip={user_ip}&port={user_port}">Chat</a>
             """
         html_list_item += "</li>"
         html_list_string += html_list_item
