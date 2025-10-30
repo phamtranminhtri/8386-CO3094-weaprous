@@ -1,48 +1,7 @@
-#
-# Copyright (C) 2025 pdnguyen of HCMC University of Technology VNU-HCM.
-# All rights reserved.
-# This file is part of the CO3093/CO3094 course,
-# and is released under the "MIT License Agreement". Please see the LICENSE
-# file that should have been included as part of this package.
-#
-# WeApRous release
-#
-# The authors hereby grant to Licensee personal permission to use
-# and modify the Licensed Source Code for the sole purpose of studying
-# while attending the course
-#
-
-
-"""
-start_p2p
-~~~~~~~~~~~~~~~~~
-"""
-
-import json
 import socket
-import argparse
-import os
-import random
 import threading
 import datetime
 import sys
-import queue
-
-
-from daemon.weaprous import WeApRous
-# from daemon import p2p
-
-PORT = 8386  # Default port
-
-app = WeApRous()
-accounts = dict()
-session_to_account = dict()
-account_to_address = dict()
-server_ip = ""
-server_port = ""
-
-send_queue = queue.Queue() # (peer ip, peer port, message to send)
-
 
 # A dictionary to store chat history
 # Format: {"ip:port": [("sent", "timestamp", "message"), ("received", "timestamp", "message")]}
@@ -225,20 +184,19 @@ def run(my_ip, my_port):
 
     # 4. Start the Main UI Loop
     while True:
-        # print("\n--- P2P Chat Menu ---")
-        # print("1. Send a message")
-        # print("2. View chat history")
-        # print("q. Quit")
-        # choice = input("Enter your choice: ").strip().lower()
+        print("\n--- P2P Chat Menu ---")
+        print("1. Send a message")
+        print("2. View chat history")
+        print("q. Quit")
+        choice = input("Enter your choice: ").strip().lower()
 
-        # if choice == '1':
+        if choice == '1':
             try:
-                target_ip, target_port_str, content = send_queue.get()
-                # target_addr_str = input("Enter target IP:port (e.g., 192.168.1.12:7000): ")
-                # target_ip, target_port_str = target_addr_str.split(':')
+                target_addr_str = input("Enter target IP:port (e.g., 192.168.1.12:7000): ")
+                target_ip, target_port_str = target_addr_str.split(':')
                 target_port = int(target_port_str)
                 
-                # content = input("Enter message: ")
+                content = input("Enter message: ")
                 if content:
                     # Send the message in a separate thread to keep UI responsive
                     # (though it's fast, this is good practice)
@@ -247,89 +205,18 @@ def run(my_ip, my_port):
                 else:
                     print("Cannot send empty message.")
 
+            except ValueError:
+                print("Invalid format. Please use IP:PORT (e.g., 192.168.1.12:7000)")
             except Exception as e:
                 print(f"An error occurred: {e}")
         
-        # elif choice == '2':
-        #     print_history()
+        elif choice == '2':
+            print_history()
         
-        # elif choice == 'q':
-        #     print("Exiting...")
-        #     sys.exit(0)
+        elif choice == 'q':
+            print("Exiting...")
+            sys.exit(0)
         
-        # else:
-        #     print("Invalid choice. Please try again.")
+        else:
+            print("Invalid choice. Please try again.")
 
-
-
-
-@app.route('/connect-peer', methods=['POST'])
-def connect_peer_post(headers, body):
-    print(f"[App] connect_peer_post with\nHeader: {headers}\nBody: {body}")
-    global server_ip
-    server_ip = body.get("server-ip", "")
-    global server_port
-    server_port = body.get("server-port", "")
-
-    peer_ip = body.get("peer-ip", "")
-    peer_port = body.get("peer-port", "")
-
-    return {"auth": "true", "redirect": f"/chat?ip={peer_ip}&port={peer_port}"}
-    
-
-
-# @app.route('/connect-peer', methods=['GET'])
-# def connect_peer_get(headers, body):
-#     print(f"[App] connect_peer_get with\nHeader: {headers}\nBody: {body}")
-
-#     return {"auth": "true", "content": "sample.html", "placeholder": (server_ip, server_port)}
-
-
-@app.route('/chat', methods=['GET'])
-def chat_get(headers, body):
-    print(f"[App] chat_get with\nHeader: {headers}\nBody: {body}")
-    peer_ip = headers["query"]["ip"]
-    peer_port = headers["query"]["port"]
-    peer_address = f"{peer_ip}:{peer_port}"
-    history = chat_history.get(peer_address, "No history")
-    return {"auth": "true", "content": "chat.html", "placeholder": (peer_address, str(history), peer_ip, peer_port)}
-
-
-@app.route('/chat', methods=['POST'])
-def chat_post(headers, body):
-    print(f"[App] chat_post with\nHeader: {headers}\nBody: {body}")
-    peer_ip = headers["query"]["ip"]
-    peer_port = headers["query"]["port"]
-    peer_address = f"{peer_ip}:{peer_port}"
-    history = chat_history.get(peer_address, "")
-
-    message_to_send = body["message"]
-    send_queue.put((peer_ip, peer_port, message_to_send))
-
-    return {"auth": "true", "redirect": f"/chat?ip={peer_ip}&port={peer_port}"}
-
-
-
-
-
-if __name__ == "__main__":
-    # Parse command-line arguments to configure server IP and port
-    parser = argparse.ArgumentParser(prog='P2P Chat', description='Peer-to-peer chat application', epilog='P2P daemon')
-    parser.add_argument('--server-port', type=int, default=PORT)
-    parser.add_argument('--chat-ip', default='127.0.0.1')
-    parser.add_argument('--chat-port', type=int, default=PORT + 1000, 
-                        help='Port to listen for incoming peer messages')
- 
-    args = parser.parse_args()
-    server_ip = "127.0.0.1"
-    server_port = args.server_port
-    chat_ip = args.chat_ip
-    chat_port = args.chat_port
-
-    chat_thread = threading.Thread(target=run, args=(chat_ip, chat_port))
-    chat_thread.start()
-
-    # Prepare and launch the RESTful application
-    app.prepare_address(server_ip, server_port)
-    app.run()
-    # app.run_proxy()
