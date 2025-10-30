@@ -158,7 +158,14 @@ class HttpAdapter:
         # BƯỚC 4: PHÂN TÍCH HEADERS
         # ========================================
         req.headers = req.prepare_headers(header_str)
-
+        if 'expect' in req.headers and req.headers['expect'].lower() == '100-continue':
+            print(f"[HttpAdapter] Sending 100 Continue to {addr}")
+            try:
+                conn.sendall(b'HTTP/1.1 100 Continue\r\n\r\n')
+            except Exception as e:
+                print(f"[HttpAdapter] Error sending 100 Continue: {e}")
+                conn.close()
+                return
         # ========================================
         # BƯỚC 5: ĐỌC BODY (nếu có Content-Length)
         # ========================================
