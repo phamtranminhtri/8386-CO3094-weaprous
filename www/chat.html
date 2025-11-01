@@ -1,0 +1,25 @@
+<!doctype html>
+<html>
+<head>
+    <title>Chat</title>
+
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="css/styles.css" />
+</head>
+
+<body>
+<div>
+    <h1>Chat with {{ placeholder_0 }}</h1>
+    <br>
+    {{ placeholder_1 }}
+    <br>
+    <form method="POST" action="/chat?ip={{ placeholder_2 }}&port={{ placeholder_3 }}">
+        Type your message: <input name="message" type="text">
+        <input type="submit" value="Send">
+    </form>
+    <a href="http://{{ placeholder_4 }}:{{ placeholder_5 }}">Back to index</a>
+</div>
+</body>
+</html>
