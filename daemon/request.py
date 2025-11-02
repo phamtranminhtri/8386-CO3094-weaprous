@@ -149,17 +149,8 @@ class Request():
 
         content_type = self.headers.get('content-type', '')
         if content_type == "application/x-www-form-urlencoded":
-            try:
-                list_of_tuples = urllib.parse.parse_qsl(
-                    data, 
-                    keep_blank_values=True, 
-                    encoding='utf-8', 
-                    errors='replace'
-                )
-                body = dict(list_of_tuples)
-            except Exception as e:
-                print(f"[Request] Lỗi parse body: {e}")
-                body = None
+            list_of_tuples = urllib.parse.parse_qsl(data)
+            body = dict(list_of_tuples)
         
         # if json is not None:
         #     import json as json_module
