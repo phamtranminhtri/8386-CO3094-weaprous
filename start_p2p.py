@@ -40,6 +40,7 @@ session_to_account = dict()
 account_to_address = dict()
 server_ip = ""
 server_port = ""
+peer_list = []
 
 send_queue = queue.Queue() # (peer ip, peer port, message to send)
 
@@ -311,6 +312,43 @@ def chat_post(headers, body):
     send_queue.put((peer_ip, peer_port, message_to_send))
 
     return {"auth": "true", "redirect": f"/chat?ip={peer_ip}&port={peer_port}"}
+
+
+@app.route('/broadcast0', methods=['POST'])
+def broadcast0(headers, body):
+    print(f"[App] broadcast0 with\nHeader: {headers}\nBody: {body}")
+    global server_ip
+    server_ip = body.get("server-ip", "")
+    global server_port
+    server_port = body.get("server-port", "")
+    global peer_list
+    addresses = body.get("peer-list", "")
+    if addresses:
+        peer_list = addresses.split("_")
+    else:
+        peer_list = []
+    return {"auth": "true", "redirect": "/broadcast"}
+
+
+@app.route('/broadcast', methods=['GET'])
+def broadcast_get(headers, body):
+    print(f"[App] broadcast_get with\nHeader: {headers}\nBody: {body}")
+    return {
+        "auth": "true", 
+        "content": "broadcast.html", 
+        "placeholder": (server_ip, str(server_port))
+    }
+
+
+@app.route('/broadcast', methods=['POST'])
+def broadcast_post(headers, body):
+    print(f"[App] broadcast_post with\nHeader: {headers}\nBody: {body}")
+    message_to_send = "[Broadcast] " + body["message"]
+    for peer in peer_list:
+        peer_ip, peer_port = peer.split(":")
+        send_queue.put((peer_ip, peer_port, message_to_send))
+
+    return {"auth": "true", "redirect": "/broadcast"}
 
 
 

@@ -141,7 +141,15 @@ def get_list(headers, body):
         return {"auth": "false"}
     
     html_list_string = ""
+    address_list = []
     current_username = get_username(headers)
+
+    if current_username not in account_to_address:
+        html_list_string = "You need to submit a address (IP + port) before chatting."
+        broadcast = ""
+        return {"auth": "true", "content": "get-list.html", "placeholder": (html_list_string, broadcast)}
+
+
     _, _, current_user_local_port = account_to_address[current_username]
     for username, (user_ip, user_port, _) in account_to_address.items():
         html_list_item = f"""
@@ -149,6 +157,7 @@ def get_list(headers, body):
             <b>{username}</b>'s address: [ {user_ip}:{user_port} ]
         """
         if username != current_username:
+            address_list.append(f"{user_ip}:{user_port}")
             html_list_item += f"""
                 <form method="POST" action="http://127.0.0.1:{current_user_local_port}/connect-peer">
                     <input type="hidden" name="peer-ip" value="{user_ip}">
@@ -161,10 +170,17 @@ def get_list(headers, body):
         html_list_item += "</li>"
         html_list_string += html_list_item
 
-    if current_username not in account_to_address:
-        html_list_string = "You need to submit a address (IP + port) before chatting."
+    addresses = "_".join(address_list)
+    broadcast = f"""
+                <form method="POST" action="http://127.0.0.1:{current_user_local_port}/broadcast0">
+                    <input type="hidden" name="peer-list" value="{addresses}">
+                    <input type="hidden" name="server-ip" value="{app.ip}">
+                    <input type="hidden" name="server-port" value="{app.port}">
+                    <input type="submit" value="Broadcast">
+                </form>
+            """
 
-    return {"auth": "true", "content": "get-list.html", "placeholder": (html_list_string,)}
+    return {"auth": "true", "content": "get-list.html", "placeholder": (html_list_string, broadcast)}
 
 
 def authenticate(headers):
