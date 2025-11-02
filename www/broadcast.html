@@ -1,7 +1,7 @@
 <!doctype html>
 <html>
 <head>
-    <title>List of peers</title>
+    <title>Chat</title>
 
     <meta charset="utf-8" />
     <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
@@ -11,12 +11,12 @@
 
 <body>
 <div>
-    <h1>Active peers:</h1>
-    <ol>
-        {{ placeholder_0 }}
-    </ol>
-    {{ placeholder_1 }}
-    <a href="/">Back to index</a>
+    <h1>Broadcast</h1>
+    <form method="POST" action="/broadcast">
+        Type your message: <input name="message" type="text">
+        <input type="submit" value="Send">
+    </form>
+    <a href="http://{{ placeholder_0 }}:{{ placeholder_1 }}">Back to index</a>
 </div>
 </body>
 </html>
