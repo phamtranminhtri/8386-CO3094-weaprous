@@ -322,7 +322,7 @@ def chat_get(headers, body):
     return {
         "auth": "true", 
         "content": "chat.html", 
-        "placeholder": (peer_address, str(history), peer_ip, peer_port, server_ip, str(server_port))
+        "placeholder": (peer_address, display_message(history), peer_ip, peer_port, server_ip, str(server_port))
     }
 
 
@@ -408,7 +408,7 @@ def channel_get(headers, body):
     return {
         "auth": "true", 
         "content": "channel.html", 
-        "placeholder": (channel_name, str(history), channel_name, server_ip, str(server_port))
+        "placeholder": (channel_name, display_message(history), channel_name, server_ip, str(server_port))
     }
 
 
@@ -432,6 +432,15 @@ def broadcast_message(address_list, message):
             peer_ip, peer_port = peer.split(":")
             send_queue.put((peer_ip, peer_port, message))
 
+
+def display_message(message_list):
+    if isinstance(message_list, str):
+        return message_list
+    
+    html_message = ""
+    for sender, timestamp, message in message_list:
+        html_message += f"<b>{sender}</b> (<em>{timestamp}</em>): {message}<br>"
+    return html_message
 
 
 if __name__ == "__main__":
