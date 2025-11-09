@@ -49,12 +49,12 @@ channels = dict()
 send_queue = queue.Queue()  # (peer ip, peer port, message to send)
 
 
-# A dictionary to store chat history
+# store chat history
 # Format: {"ip:port": [("sent", "timestamp", "message"), ("received", "timestamp", "message")]}
 chat_history = dict()
 # Format: {"channel_name": [("ip:port", "timestamp", "message"), ("ip:port", "timestamp", "message")]}
 channel_history = dict()
-# A lock to ensure thread-safe access to chat_history
+
 history_lock = threading.Lock()
 channel_history_lock = threading.Lock()
 channel_list_lock = threading.Lock()
@@ -74,11 +74,9 @@ def handle_incoming_connection(connection):
             message_str = data.decode("utf-8")
 
             # Message format: "[sender_ip:port] [time] [content]"
-            # We split on the first two spaces to isolate the 3 parts
             try:
                 sender_address, timestamp, content = message_str.split(" ", 2)
 
-                # Log the received message
                 print(
                     f"\n[Received from {sender_address}] @ {timestamp}:\n  {content}\n"
                 )
@@ -130,8 +128,6 @@ def start_server(host, port):
         while True:
             # Wait for and accept an incoming connection
             conn, addr = server_socket.accept()
-            # Start a new thread to handle this connection
-            # daemon=True so threads exit when the main program exits
             handler_thread = threading.Thread(
                 target=handle_incoming_connection, args=(conn,), daemon=True
             )
@@ -165,7 +161,6 @@ def send_message(target_ip, target_port, content):
     try:
         # Create a new socket for this *outgoing* connection
         client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        # Set a timeout for the connection attempt
         client_socket.settimeout(5)
 
         client_socket.connect((target_ip, target_port))
@@ -173,7 +168,7 @@ def send_message(target_ip, target_port, content):
 
         print(f"\n[Message sent to {target_address_str}]\n")
 
-        # Update our local chat history
+        # update local chat history
         if content.startswith("[Channel]"):
             _, channel_name, message = content.split("___")
             # with channel_history_lock:
@@ -207,22 +202,19 @@ def run(my_ip, my_port):
     print(f"\nYour listening address is: {my_listening_address}")
     print("Share this with peers so they can message you.")
 
-    # 3. Start the Server Thread
-    # We listen on '0.0.0.0' to accept connections from any IP
+    # server thread listen on '0.0.0.0' to accept connections from any IP
     server_thread = threading.Thread(
         target=start_server, args=("0.0.0.0", my_port), daemon=True
     )
     server_thread.start()
 
-    # 4. Start the Main UI Loop
+    # main loop
     while True:
         try:
             target_ip, target_port_str, content = send_queue.get()
             target_port = int(target_port_str)
 
             if content:
-                # Send the message in a separate thread to keep UI responsive
-                # (though it's fast, this is good practice)
                 send_thread = threading.Thread(
                     target=send_message,
                     args=(target_ip, target_port, content),
