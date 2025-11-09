@@ -204,19 +204,6 @@ def channel_get(headers, body):
     peer_address = f"{peer_ip}:{peer_port}"
     for channel_name, (address_list, _) in channels.items():
         if peer_address in address_list:
-            addresses = "_".join(address_list)
-            # joined_channel_html += f"""
-            #     <li>
-            #     <b>{channel_name}</b>
-            #     <form method="POST" action="http://127.0.0.1:{local_port}/connect-channel">
-            #         <input type="hidden" name="peer-list" value="{addresses}">
-            #         <input type="hidden" name="server-ip" value="{app.ip}">
-            #         <input type="hidden" name="server-port" value="{app.port}">
-            #         <input type="hidden" name="channel-name" value="{channel_name}">
-            #         <input type="submit" value="Chat">
-            #     </form>
-            #     </li>
-            # """
             joined_channel_html += f"""
                 <li>
                 <b>{channel_name}</b>
@@ -258,19 +245,12 @@ def connect_channel(headers, body):
     address_list, _ = channels[channel_name]
     addresses = "_".join(address_list)
 
-    # 1. Represent your form data as a Python dictionary
     data = {
         'peer-list': addresses,
         'server-ip': app.ip,
         'server-port': app.port,
         'channel-name': channel_name
     }
-
-    # # 2. Use urlencode to create the body string
-    # raw_body = urlencode(data)
-
-    # # 3. Print the result
-    # print(raw_body)
 
     current_username = get_username(headers)
     _, _, local_port = account_to_address[current_username]

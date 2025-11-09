@@ -344,36 +344,6 @@ class Response():
             ).encode('utf-8')
 
 
-    def build_temp_redirect(self, path, body=""):
-        """
-        Constructs a standard 307 Temporary Redirect HTTP response.
-        
-        HTTP 307 preserves the request method and body during redirection,
-        unlike 302 which may change POST to GET.
-
-        :params path (str): The path to redirect to (e.g., "/", "/login").
-        :params body (str): Optional body content to include in the redirect response.
-
-        :rtype bytes: Encoded 307 temporary redirect response.
-        """
-
-        if not body:
-            body = f"Temporarily redirecting to {path}"
-        
-        content_length = len(body)
-
-        return (
-            "HTTP/1.1 307 Temporary Redirect\r\n"
-            f"Location: {path}\r\n"
-            "Content-Type: text/html\r\n"
-            f"Content-Length: {content_length}\r\n"
-            "Cache-Control: no-cache\r\n"
-            "Connection: close\r\n"
-            "\r\n"
-            f"{body}"
-        ).encode('utf-8')
-
-
     def build_post_redirect_page(self, path, body_dict):
         """
         Constructs an HTML page with an auto-submitting form to perform a POST redirect.
