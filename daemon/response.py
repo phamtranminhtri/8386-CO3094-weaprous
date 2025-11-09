@@ -344,6 +344,79 @@ class Response():
             ).encode('utf-8')
 
 
+    def build_temp_redirect(self, path, body=""):
+        """
+        Constructs a standard 307 Temporary Redirect HTTP response.
+        
+        HTTP 307 preserves the request method and body during redirection,
+        unlike 302 which may change POST to GET.
+
+        :params path (str): The path to redirect to (e.g., "/", "/login").
+        :params body (str): Optional body content to include in the redirect response.
+
+        :rtype bytes: Encoded 307 temporary redirect response.
+        """
+
+        if not body:
+            body = f"Temporarily redirecting to {path}"
+        
+        content_length = len(body)
+
+        return (
+            "HTTP/1.1 307 Temporary Redirect\r\n"
+            f"Location: {path}\r\n"
+            "Content-Type: text/html\r\n"
+            f"Content-Length: {content_length}\r\n"
+            "Cache-Control: no-cache\r\n"
+            "Connection: close\r\n"
+            "\r\n"
+            f"{body}"
+        ).encode('utf-8')
+
+
+    def build_post_redirect_page(self, path, body_dict):
+        """
+        Constructs an HTML page with an auto-submitting form to perform a POST redirect.
+
+        :param path (str): The target URL for the form submission.
+        :param body_dict (dict): A dictionary of key-value pairs for the form's hidden inputs.
+        :rtype: bytes
+        """
+        form_inputs = ""
+        for key, value in body_dict.items():
+            form_inputs += f'<input type="hidden" name="{key}" value="{value}">'
+
+        html_content = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Redirecting...</title>
+            </head>
+            <body onload="document.forms[0].submit()">
+                <p>Redirecting to {path}...</p>
+                <form action="{path}" method="POST">
+                    {form_inputs}
+                </form>
+            </body>
+            </html>
+        """
+        
+        content = html_content.encode('utf-8')
+        content_length = len(content)
+
+        response_header = (
+            "HTTP/1.1 200 OK\r\n"
+            "Content-Type: text/html; charset=utf-8\r\n"
+            f"Content-Length: {content_length}\r\n"
+            "Cache-Control: no-cache\r\n"
+            "Connection: close\r\n"
+            "\r\n"
+        ).encode('utf-8')
+
+        return response_header + content
+
+
+
     def build_content_placeholder(self, req, html_content, placeholders):
         html_path = os.path.join("www", html_content)
         with open(html_path) as f:

@@ -23,15 +23,17 @@ import socket
 import argparse
 import os
 import random
+from urllib.parse import urlencode
 
 from daemon.weaprous import WeApRous
 
 PORT = 8000  # Default port
 
 app = WeApRous()
-accounts = dict()
-session_to_account = dict()
-account_to_address = dict()
+accounts = dict()               # map: username -> hash password
+session_to_account = dict()     # map: session id -> username
+account_to_address = dict()     # map: username -> (peer ip, peer port, local port)
+channels = dict()               # map: channel name -> ( peer address list, channel password )
 
 
 @app.route('/login', methods=['POST'])
@@ -97,13 +99,18 @@ def index(headers, body):
         return {"auth": "false"}
     
     username = get_username(headers)
+    functions = ""
     user_ip, user_port, user_local_port = account_to_address.get(username, (None, None, None))
     if user_ip and user_port and user_local_port:
         address_noti_message = f"Your submitted chatting address is [ {user_ip}:{user_port} ]."
+        functions = """
+            <li><a href="/get-list">Get list of active peer address</a></li>
+            <li><a href="/channel">View channels</a></li>
+        """
     else:
         address_noti_message = "You need to submit a address (IP + port) before chatting."
 
-    return {"auth": "true", "content": "index.html", "placeholder": (username, address_noti_message)}
+    return {"auth": "true", "content": "index.html", "placeholder": (username, address_noti_message, functions)}
 
 
 @app.route('/submit-info', methods=['POST'])
@@ -181,6 +188,134 @@ def get_list(headers, body):
             """
 
     return {"auth": "true", "content": "get-list.html", "placeholder": (html_list_string, broadcast)}
+
+
+@app.route('/channel', methods=['GET'])
+def channel_get(headers, body):
+    print(f"[App] channel_get with\nHeader: {headers}\nBody: {body}")
+    if not authenticate(headers):
+        return {"auth": "false"}
+    
+    current_username = get_username(headers)
+    joined_channel_html = ""
+    available_channel_html = ""
+
+    peer_ip, peer_port, local_port = account_to_address[current_username]
+    peer_address = f"{peer_ip}:{peer_port}"
+    for channel_name, (address_list, _) in channels.items():
+        if peer_address in address_list:
+            addresses = "_".join(address_list)
+            # joined_channel_html += f"""
+            #     <li>
+            #     <b>{channel_name}</b>
+            #     <form method="POST" action="http://127.0.0.1:{local_port}/connect-channel">
+            #         <input type="hidden" name="peer-list" value="{addresses}">
+            #         <input type="hidden" name="server-ip" value="{app.ip}">
+            #         <input type="hidden" name="server-port" value="{app.port}">
+            #         <input type="hidden" name="channel-name" value="{channel_name}">
+            #         <input type="submit" value="Chat">
+            #     </form>
+            #     </li>
+            # """
+            joined_channel_html += f"""
+                <li>
+                <b>{channel_name}</b>
+                <form method="POST" action="/connect-channel">
+                    <input type="hidden" name="channel-name" value="{channel_name}">
+                    <input type="submit" value="Chat">
+                </form>
+                </li>
+            """
+
+        else:
+            available_channel_html += f"""
+                <li>
+                <b>{channel_name}</b>
+                <form method="POST" action="/join-channel">
+                    Channel password: <input name="channel-password" type="password"><br>
+                    <input type="hidden" name="channel-name" value="{channel_name}">
+                    <input type="submit" value="Join">
+                </form>
+                </li>
+            """
+
+    
+
+    return {"auth": "true", "content": "channel-list.html", "placeholder": (joined_channel_html, available_channel_html)}
+
+
+@app.route('/connect-channel', methods=['POST'])
+def connect_channel(headers, body):
+    print(f"[App] connect_channel with\nHeader: {headers}\nBody: {body}")
+    if not authenticate(headers):
+        return {"auth": "false"}
+    
+    channel_name = body.get("channel-name", "")
+    
+    if (not channel_name) or (channel_name not in channels):
+        return {"auth": "true", "redirect": "/channel"}
+    
+    address_list, _ = channels[channel_name]
+    addresses = "_".join(address_list)
+
+    # 1. Represent your form data as a Python dictionary
+    data = {
+        'peer-list': addresses,
+        'server-ip': app.ip,
+        'server-port': app.port,
+        'channel-name': channel_name
+    }
+
+    # # 2. Use urlencode to create the body string
+    # raw_body = urlencode(data)
+
+    # # 3. Print the result
+    # print(raw_body)
+
+    current_username = get_username(headers)
+    _, _, local_port = account_to_address[current_username]
+    
+    return {"auth": "true", "temp_redirect": f"http://127.0.0.1:{local_port}/connect-channel", "temp_body": data}
+
+
+@app.route('/create-channel', methods=['POST'])
+def create_channel(headers, body):
+    print(f"[App] create_channel with\nHeader: {headers}\nBody: {body}")
+    if not authenticate(headers):
+        return {"auth": "false"}
+    
+    channel_name = body.get("channel-name", "")
+    channel_password = body.get("channel-password", "")
+    if (not channel_name) or (channel_name in channels) or (not channel_password):
+        return {"auth": "true", "redirect": "/channel"}
+    
+    username = get_username(headers)
+    peer_ip, peer_port, _ = account_to_address[username]
+    channels[channel_name] = ([f"{peer_ip}:{peer_port}"], hash(channel_password))
+    return {"auth": "true", "redirect": "/channel"}
+
+
+@app.route('/join-channel', methods=['POST'])
+def join_channel(headers, body):
+    print(f"[App] join_channel with\nHeader: {headers}\nBody: {body}")
+    if not authenticate(headers):
+        return {"auth": "false"}
+    
+    channel_name = body.get("channel-name", "")
+    channel_password = body.get("channel-password", "")
+
+    if (not channel_name) or (channel_name not in channels) or (not channel_password):
+        return {"auth": "true", "redirect": "/channel"}
+    
+    address_list, password_hash = channels[channel_name]
+    if hash(channel_password) != password_hash:
+        return {"auth": "true", "redirect": "/channel"}
+
+    username = get_username(headers)
+    peer_ip, peer_port, _ = account_to_address[username]
+    address_list.append(f"{peer_ip}:{peer_port}")
+
+    return {"auth": "true", "redirect": "/channel"}
 
 
 def authenticate(headers):
