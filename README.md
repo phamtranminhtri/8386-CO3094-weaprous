@@ -4,7 +4,7 @@ This document provides an overview of the key Python scripts and modules in this
 
 ## 1. How to run
 
-### Option 1: Run server and clients on 1 computer
+### 1.1. Option 1: Run server and clients on 1 computer
 
 To start the server, open 2 terminals and run:
 ```bash
@@ -36,7 +36,7 @@ After login/register successfully, each client need to submit 3 information befo
 
 > **Note**: Because we are only using 1 computer, we need to make sure the port used for each client are different from each other and from server's.
 
-### Option 2: Run server on 1 computer and each client on a computer
+### 1.2. Option 2: Run server on 1 computer and each client on a computer
 
 Suppose there are 3 computer (A, B, C), computer A acts as server, and computer B and C are clients. The server and clients all need to be on the same LAN.
 
@@ -77,3 +77,23 @@ python start_p2p.py --chat-ip 192.168.1.27 --chat-port 12000 --server-port 10000
 Then computer B and computer C each can access `http://192.168.1.6:8000` to join. Each client then need to submit their respective Chat IP - Chat port - Local port before chatting.
 
 > **Note**: Because we are using 1 computer for server and each client, the ports for them don't have to be different.
+
+
+
+## 2. Usage
+
+### 2.1. Chat between 2 peer
+
+At index page, select "_2. Get list of active peer address_". A page with a list of peer address will appear. Click on "_Chat_" button next to a peer to chat to them.
+
+There is also a button "_Broadcast_" at the end to send message to every peer on the list.
+
+### 2.2. Chat in a channel (group of multiple peers)
+
+You can create a new channel, or join any existing channels.
+
+- To create a new channel, input channel name and password and click "_Create_"
+
+- To join an existing channel, input the channel's password in the box next to that channel name, then click "_Join_".
+
+After you have created or joined a channel, it will appear on the "Joined" list. Click on the "_Chat_" button next to a channel name to begin chatting.
