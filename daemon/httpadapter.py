@@ -103,7 +103,7 @@ class HttpAdapter:
         resp = self.response
 
         # Handle the request
-        msg = conn.recv(1024).decode()
+        msg = conn.recv(8192).decode()
         req.prepare(msg, routes)
 
         # Handle request hook
@@ -127,6 +127,16 @@ class HttpAdapter:
                 conn.sendall(response)
                 conn.close()
                 return
+            
+            temp_redirect = hook_result.get("temp_redirect", None)
+            temp_body = hook_result.get("temp_body", "")
+            if temp_redirect:
+                print(f"\n\n{temp_redirect}\n\n{temp_body}\n\n")
+                response = resp.build_post_redirect_page(temp_redirect, temp_body)
+                conn.sendall(response)
+                conn.close()
+                return
+
 
             content = hook_result.get("content", None)
             placeholder = hook_result.get("placeholder", None)

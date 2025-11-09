@@ -1,0 +1,36 @@
+<!doctype html>
+<html>
+
+<head>
+    <title>Channels</title>
+
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="css/styles.css" />
+</head>
+
+<body>
+    <div>
+        <h3>Joined channels</h3>
+        <ul>
+            {{ placeholder_0 }}
+        </ul>
+
+        <h3>Available channels</h3>
+        Enter channel's password correctly and click "Join"
+        <ul>
+            {{ placeholder_1 }}
+        </ul>
+
+        <h3>Create a new channel</h3>
+        <form method="POST" action="/create-channel">
+            Channel name: <input name="channel-name" type="text"><br>
+            Password: <input name="channel-password" type="password"><br>
+            <input type="submit" value="Create">
+        </form>
+        <a href="/">Back to index</a>
+    </div>
+</body>
+
+</html>

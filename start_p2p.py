@@ -27,6 +27,8 @@ import threading
 import datetime
 import sys
 import queue
+import urllib.parse
+from collections import defaultdict
 
 
 from daemon.weaprous import WeApRous
@@ -41,15 +43,20 @@ account_to_address = dict()
 server_ip = ""
 server_port = ""
 peer_list = []
+channels = dict()
 
 send_queue = queue.Queue() # (peer ip, peer port, message to send)
 
 
 # A dictionary to store chat history
 # Format: {"ip:port": [("sent", "timestamp", "message"), ("received", "timestamp", "message")]}
-chat_history = {}
+chat_history = dict()
+# Format: {"channel_name": [("ip:port", "timestamp", "message"), ("ip:port", "timestamp", "message")]}
+channel_history = dict()
 # A lock to ensure thread-safe access to chat_history
 history_lock = threading.Lock()
+channel_history_lock = threading.Lock()
+channel_list_lock = threading.Lock()
 
 # This will be set to this user's listening address (e.g., "192.168.1.6:5000")
 my_listening_address = ""
@@ -73,10 +80,22 @@ def handle_incoming_connection(connection):
                 print(f"\n[Received from {sender_address}] @ {timestamp}:\n  {content}\n")
                 
                 # Update the chat history
-                with history_lock:
-                    if sender_address not in chat_history:
-                        chat_history[sender_address] = []
-                    chat_history[sender_address].append(("received", timestamp, content))
+                if content.startswith("[Channel]"):
+                    _, channel_name, message = content.split("___")
+                    if channel_name in channels:
+                        address_list = channels[channel_name]
+                        if sender_address not in address_list:
+                            with channel_list_lock:
+                                address_list.append(sender_address)
+                        with channel_history_lock:
+                            if channel_name not in channel_history:
+                                channel_history[channel_name] = []
+                            channel_history[channel_name].append((sender_address, timestamp, message))
+                else:
+                    with history_lock:
+                        if sender_address not in chat_history:
+                            chat_history[sender_address] = []
+                        chat_history[sender_address].append(("received", timestamp, content))
                     
             except ValueError:
                 print(f"\n[Received malformed message]: {message_str}\n")
@@ -143,10 +162,17 @@ def send_message(target_ip, target_port, content):
         print(f"\n[Message sent to {target_address_str}]\n")
         
         # Update our local chat history
-        with history_lock:
-            if target_address_str not in chat_history:
-                chat_history[target_address_str] = []
-            chat_history[target_address_str].append(("sent", timestamp, content))
+        if content.startswith("[Channel]"):
+            _, channel_name, message = content.split("___")
+            # with channel_history_lock:
+            #     if channel_name not in channel_history:
+            #         channel_history[channel_name] = []
+            #     channel_history[channel_name].append((my_listening_address, timestamp, message))
+        else:
+            with history_lock:
+                if target_address_str not in chat_history:
+                    chat_history[target_address_str] = []
+                chat_history[target_address_str].append(("sent", timestamp, content))
             
     except socket.timeout:
         print(f"\n[Error] Connection to {target_address_str} timed out.\n")
@@ -351,6 +377,60 @@ def broadcast_post(headers, body):
     return {"auth": "true", "redirect": "/broadcast"}
 
 
+@app.route('/connect-channel', methods=['POST'])
+def connect_channel(headers, body):
+    print(f"[App] connect_channel with\nHeader: {headers}\nBody: {body}")
+
+    global server_ip
+    server_ip = body.get("server-ip", "")
+    global server_port
+    server_port = body.get("server-port", "")
+    channel_name = body.get("channel-name", "") 
+    addresses = body.get("peer-list", "")
+    address_list = addresses.split("_")
+
+    # if channel_name in channels:
+    #     return {"auth": "true", "redirect": f"/channel?name={urllib.parse.quote(channel_name)}"}
+    
+    channels[channel_name] = address_list
+    message_to_send = "___".join(["[Channel]", channel_name, f"{my_listening_address} has joined"])
+    broadcast_message(address_list, message_to_send)
+    return {"auth": "true", "redirect": f"/channel?name={urllib.parse.quote(channel_name)}"}
+
+
+@app.route('/channel', methods=['GET'])
+def channel_get(headers, body):
+    print(f"[App] channel_get with\nHeader: {headers}\nBody: {body}")
+
+    channel_name = headers["query"]["name"]
+    history = channel_history.get(channel_name, "No history")
+
+    return {
+        "auth": "true", 
+        "content": "channel.html", 
+        "placeholder": (channel_name, str(history), channel_name, server_ip, str(server_port))
+    }
+
+
+@app.route('/channel', methods=['POST'])
+def channel_post(headers, body):
+    print(f"[App] channel_post with\nHeader: {headers}\nBody: {body}")
+
+    channel_name = headers["query"]["name"]
+    message = body["message"]
+    address_list = channels[channel_name]
+    message_to_send = "___".join(["[Channel]", channel_name, message])
+    broadcast_message(address_list, message_to_send)
+    
+
+    return {"auth": "true", "redirect": f"/channel?name={urllib.parse.quote(channel_name)}"}
+
+
+def broadcast_message(address_list, message):
+    for peer in address_list:
+        # if peer != my_listening_address:
+            peer_ip, peer_port = peer.split(":")
+            send_queue.put((peer_ip, peer_port, message))
 
 
 
