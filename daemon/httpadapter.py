@@ -24,6 +24,13 @@ from .request import Request
 from .response import Response
 from .dictionary import CaseInsensitiveDict
 
+# * new lib add
+import hashlib
+import base64
+import struct
+import json
+import threading
+
 class HttpAdapter:
     """
     A mutable :class:`HTTP adapter <HTTP adapter>` for managing client connections
@@ -157,3 +164,5 @@ class HttpAdapter:
         #print(response)
         conn.sendall(response)
         conn.close()
+
+    
