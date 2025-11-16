@@ -389,7 +389,7 @@ class Response():
 
     def build_content_placeholder(self, req, html_content, placeholders):
         html_path = os.path.join("www", html_content)
-        with open(html_path) as f:
+        with open(html_path,encoding="utf-8") as f:
             raw_html = f.read()
         for i, placeholder in enumerate(placeholders):
             raw_html = raw_html.replace(f"{{{{ placeholder_{i} }}}}", placeholder)
