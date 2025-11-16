@@ -2,7 +2,6 @@
 <html>
 <head>
     <title>Chat</title>
-
     <meta charset="utf-8" />
     <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -13,7 +12,9 @@
 <div>
     <h1>Chat with {{ placeholder_0 }}</h1>
     <br>
-    {{ placeholder_1 }}
+    <div id="message-container">
+        {{ placeholder_1 }}
+    </div>
     <br>
     <form method="POST" action="/chat?ip={{ placeholder_2 }}&port={{ placeholder_3 }}">
         Type your message: <input name="message" type="text">
@@ -21,5 +22,39 @@
     </form>
     <a href="http://{{ placeholder_4 }}:{{ placeholder_5 }}">Back to index</a>
 </div>
+
+<script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const peerIp = urlParams.get('ip');
+    const peerPort = urlParams.get('port');
+    
+    function updateMessages() {
+        fetch(`/chat?ip=${peerIp}&port=${peerPort}`)
+            .then(response => response.text())
+            .then(html => {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const newMessages = doc.getElementById('message-container');
+                
+                if (newMessages) {
+                    const currentContainer = document.getElementById('message-container');
+                    if (currentContainer.innerHTML !== newMessages.innerHTML) {
+                        currentContainer.innerHTML = newMessages.innerHTML;
+                        
+                        currentContainer.scrollTop = currentContainer.scrollHeight;
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching messages:', error);
+            })
+            .finally(() => {
+                setTimeout(updateMessages, 100);
+            });
+    }
+    
+    setTimeout(updateMessages, 100);
+</script>
+
 </body>
-</html>
+</html> 

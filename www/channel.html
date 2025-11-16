@@ -13,7 +13,9 @@
 <div>
     <h1>Chat channel: {{ placeholder_0 }}</h1>
     <br>
-    {{ placeholder_1 }}
+    <div id="message-container">
+        {{ placeholder_1 }}
+    </div>
     <br>
     <form method="POST" action="/channel?name={{ placeholder_2 }}">
         Type your message: <input name="message" type="text">
@@ -21,5 +23,50 @@
     </form>
     <a href="http://{{ placeholder_3 }}:{{ placeholder_4 }}">Back to index</a>
 </div>
+
+<script>
+    // Get channel name from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const channelName = urlParams.get('name');
+    
+    function updateMessages() {
+        if (!channelName) {
+            console.error('Missing channel name');
+            return;
+        }
+        
+        // Fetch the same /channel endpoint
+        fetch(`/channel?name=${channelName}`)
+            .then(response => response.text())
+            .then(html => {
+                // Parse HTML to extract message content
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const newMessages = doc.getElementById('message-container');
+                
+                if (newMessages) {
+                    // Update only the message container
+                    const currentContainer = document.getElementById('message-container');
+                    if (currentContainer.innerHTML !== newMessages.innerHTML) {
+                        currentContainer.innerHTML = newMessages.innerHTML;
+                        
+                        // Optional: scroll to bottom if needed
+                        currentContainer.scrollTop = currentContainer.scrollHeight;
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching messages:', error);
+            })
+            .finally(() => {
+                // Poll again after 100ms
+                setTimeout(updateMessages, 100);
+            });
+    }
+    
+    // Start polling after page loads
+    setTimeout(updateMessages, 100);
+</script>
+
 </body>
 </html>

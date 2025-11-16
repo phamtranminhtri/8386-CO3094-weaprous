@@ -32,7 +32,6 @@ from collections import defaultdict
 
 
 from daemon.weaprous import WeApRous
-
 # from daemon import p2p
 
 PORT = 8386  # Default port
@@ -61,7 +60,6 @@ channel_list_lock = threading.Lock()
 
 # This will be set to this user's listening address (e.g., "192.168.1.6:5000")
 my_listening_address = ""
-
 
 def handle_incoming_connection(connection):
     """
@@ -375,7 +373,6 @@ def channel_post(headers, body):
         "redirect": f"/channel?name={urllib.parse.quote(channel_name)}",
     }
 
-
 def broadcast_message(address_list, message):
     for peer in address_list:
         # if peer != my_listening_address:
@@ -391,7 +388,6 @@ def display_message(message_list):
     for sender, timestamp, message in message_list:
         html_message += f"<b>{sender}</b> (<em>{timestamp}</em>): {message}<br>"
     return html_message
-
 
 if __name__ == "__main__":
     # Parse command-line arguments to configure server IP and port
