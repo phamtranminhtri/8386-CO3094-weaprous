@@ -7,9 +7,63 @@
     <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="stylesheet" href="css/styles.css" />
+
+    <!-- Toast styles -->
+    <style>
+        #toast-container {
+            position: fixed;
+            top: 16px;
+            left: 16px;
+            z-index: 9999;
+            pointer-events: none;
+            display: none;
+            background: transparent;
+            box-shadow: none;
+            margin: 0;
+            padding: 0;
+            border: 0;
+        }
+
+        .toast {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            max-width: 480px;
+
+            background: #111;
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 14px;
+            line-height: 1.4;
+
+            box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+            pointer-events: auto; /* cho phép bấm nút X */
+        }
+
+        .toast-message {
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .toast-close {
+            border: none;
+            background: transparent;
+            color: #fff;
+            font-size: 18px;
+            line-height: 1;
+            cursor: pointer;
+            padding: 0 2px;
+        }
+    </style>
 </head>
 
 <body>
+<!-- Popup thông báo (chỉ 1 dòng, có nút X) -->
+<div id="toast-container"></div>
+
 <div>
     <h1>Chat channel: {{ placeholder_0 }}</h1>
     <br>
@@ -25,33 +79,118 @@
 </div>
 
 <script>
-    // Get channel name from URL
+    // Lấy tên channel từ URL
     const urlParams = new URLSearchParams(window.location.search);
     const channelName = urlParams.get('name');
-    
+
+    const TOAST_LIFETIME_MS = 5000;
+    let lastMessageCount = null;
+    let firstLoad = true;
+    let toastTimeoutId = null;
+
+    function hideToast(toast) {
+        const container = document.getElementById('toast-container');
+        if (toast && toast.parentNode) {
+            toast.parentNode.removeChild(toast);
+        }
+        // Không còn toast nào thì ẩn container
+        if (container && container.children.length === 0) {
+            container.style.display = 'none';
+        }
+    }
+
+    // Lấy toàn bộ text hiển thị của phần tử message
+    function extractMessageText(el) {
+        if (!el) return '';
+        return (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
+    }
+
+    // Hiện một popup duy nhất
+    function showToast(text) {
+        if (!text) return;
+
+        const container = document.getElementById('toast-container');
+        if (!container) return;
+
+        // Luôn chỉ có 1 toast
+        container.innerHTML = '';
+        container.style.display = 'block';
+
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+
+        const msg = document.createElement('span');
+        msg.className = 'toast-message';
+        msg.textContent = text.trim();
+
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'toast-close';
+        closeBtn.innerHTML = '&times;';
+        closeBtn.addEventListener('click', () => {
+            if (toastTimeoutId) clearTimeout(toastTimeoutId);
+            hideToast(toast);
+        });
+
+        toast.appendChild(msg);
+        toast.appendChild(closeBtn);
+        container.appendChild(toast);
+
+        // Tự ẩn sau 5 giây
+        if (toastTimeoutId) clearTimeout(toastTimeoutId);
+        toastTimeoutId = setTimeout(() => hideToast(toast), TOAST_LIFETIME_MS);
+    }
+
     function updateMessages() {
         if (!channelName) {
             console.error('Missing channel name');
             return;
         }
-        
-        // Fetch the same /channel endpoint
-        fetch(`/channel?name=${channelName}`)
+
+        // Gọi lại chính endpoint /channel
+        fetch(`/channel?name=${encodeURIComponent(channelName)}`)
             .then(response => response.text())
             .then(html => {
-                // Parse HTML to extract message content
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(html, 'text/html');
-                const newMessages = doc.getElementById('message-container');
-                
-                if (newMessages) {
-                    // Update only the message container
-                    const currentContainer = document.getElementById('message-container');
-                    if (currentContainer.innerHTML !== newMessages.innerHTML) {
-                        currentContainer.innerHTML = newMessages.innerHTML;
-                        
-                        // Optional: scroll to bottom if needed
+                const newMessagesContainer = doc.getElementById('message-container');
+                if (!newMessagesContainer) return;
+
+                const currentContainer = document.getElementById('message-container');
+                const currentCount = newMessagesContainer.children.length;
+
+                // Lần đầu load: chỉ sync, không popup
+                if (firstLoad || lastMessageCount === null) {
+                    firstLoad = false;
+                    lastMessageCount = currentCount;
+                    if (currentContainer) {
+                        currentContainer.innerHTML = newMessagesContainer.innerHTML;
                         currentContainer.scrollTop = currentContainer.scrollHeight;
+                    }
+                    return;
+                }
+
+                const diff = currentCount - lastMessageCount;
+
+                if (currentContainer) {
+                    if (diff > 0) {
+                        // Có tin nhắn mới được append
+                        const children = Array.from(newMessagesContainer.children);
+                        const newOnes = children.slice(-diff);
+
+                        currentContainer.innerHTML = newMessagesContainer.innerHTML;
+                        currentContainer.scrollTop = currentContainer.scrollHeight;
+                        lastMessageCount = currentCount;
+
+                        // Popup cho từng tin nhắn mới
+                        newOnes.forEach(el => {
+                            const text = extractMessageText(el);
+                            showToast(text);
+                        });
+                    } else {
+                        // Không có tin mới, chỉ sync lại nội dung
+                        currentContainer.innerHTML = newMessagesContainer.innerHTML;
+                        currentContainer.scrollTop = currentContainer.scrollHeight;
+                        lastMessageCount = currentCount;
                     }
                 }
             })
@@ -59,12 +198,12 @@
                 console.error('Error fetching messages:', error);
             })
             .finally(() => {
-                // Poll again after 100ms
+                // Poll lại sau 100ms
                 setTimeout(updateMessages, 100);
             });
     }
-    
-    // Start polling after page loads
+
+    // Bắt đầu polling sau khi load trang
     setTimeout(updateMessages, 100);
 </script>
 
