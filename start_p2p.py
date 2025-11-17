@@ -161,7 +161,7 @@ def send_message(target_ip, target_port, content):
     try:
         # Create a new socket for this *outgoing* connection
         client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        client_socket.settimeout(100)
+        client_socket.settimeout(10)
 
         client_socket.connect((target_ip, target_port))
         client_socket.sendall(message.encode("utf-8"))
