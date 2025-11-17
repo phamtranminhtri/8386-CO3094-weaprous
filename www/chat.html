@@ -1,25 +1,129 @@
 <!doctype html>
 <html>
 <head>
-    <title>Chat</title>
-
+    <title>Chat with {{ placeholder_0 }}</title>
     <meta charset="utf-8" />
-    <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="stylesheet" href="css/styles.css" />
+    
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        
+        /* Khung chứa tin nhắn có thanh cuộn */
+        #chat-history-box {
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            height: 400px;
+            overflow-y: auto;
+            padding: 15px;
+            margin-bottom: 15px;
+            background-color: #f9f9f9;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Style cho từng tin nhắn */
+        .msg-row { margin-bottom: 10px; display: flex; flex-direction: column; }
+        .msg-content { padding: 8px 12px; border-radius: 15px; max-width: 70%; word-wrap: break-word; }
+        .msg-time { font-size: 0.75em; color: #888; margin-top: 2px; }
+
+        /* Tin nhắn mình gửi (nằm bên phải) */
+        .sent { align-items: flex-end; }
+        .sent .msg-content { background-color: #007bff; color: white; border-bottom-right-radius: 2px; }
+
+        /* Tin nhắn nhận được (nằm bên trái) */
+        .received { align-items: flex-start; }
+        .received .msg-content { background-color: #e9ecef; color: black; border-bottom-left-radius: 2px; }
+
+        /* Form nhập liệu */
+        .input-area { display: flex; gap: 10px; }
+        input[name="message"] { flex-grow: 1; padding: 10px; border-radius: 5px; border: 1px solid #ccc; }
+        input[type="submit"] { padding: 10px 20px; background-color: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        input[type="submit"]:hover { background-color: #218838; }
+    </style>
 </head>
 
 <body>
 <div>
-    <h1>Chat with {{ placeholder_0 }}</h1>
-    <br>
-    {{ placeholder_1 }}
-    <br>
-    <form method="POST" action="/chat?ip={{ placeholder_2 }}&port={{ placeholder_3 }}">
-        Type your message: <input name="message" type="text">
+    <h1>Chat with <span style="color: #007bff;">{{ placeholder_0 }}</span></h1>
+    
+    <div id="chat-history-box">
+        {{ placeholder_1 }}
+    </div>
+
+    <form class="input-area" method="POST" action="/chat?ip={{ placeholder_2 }}&port={{ placeholder_3 }}">
+        <input name="message" type="text" placeholder="Type your message..." autofocus autocomplete="off">
         <input type="submit" value="Send">
     </form>
-    <a href="http://{{ placeholder_4 }}:{{ placeholder_5 }}">Back to index</a>
+
+    <br>
+    <a href="http://{{ placeholder_4 }}:{{ placeholder_5 }}">⬅ Back to index</a>
 </div>
+
+<script>
+    // Lấy thông tin Peer từ template server điền vào
+    const peerIp = "{{ placeholder_2 }}";
+    const peerPort = "{{ placeholder_3 }}";
+    const chatBox = document.getElementById("chat-history-box");
+
+    // Biến lưu trữ số lượng tin nhắn để tránh render lại nếu không có tin mới
+    let lastMsgCount = 0;
+
+    async function fetchMessages() {
+        try {
+            // Gọi API Python (cần đảm bảo bạn đã thêm route /get-messages vào start_p2p.py)
+            const response = await fetch(`/get-messages?ip=${peerIp}&port=${peerPort}`);
+            
+            // Nếu server trả về lỗi hoặc chưa có API này
+            if (!response.ok) return;
+
+            const messages = await response.json();
+
+            // Nếu không có tin nhắn mới thì thôi, đỡ tốn tài nguyên vẽ lại
+            // (Logic đơn giản: so sánh độ dài mảng)
+            if (messages.length === lastMsgCount && messages.length > 0) return;
+            
+            lastMsgCount = messages.length;
+
+            // Xóa nội dung cũ
+            chatBox.innerHTML = "";
+
+            // Vẽ lại toàn bộ tin nhắn từ JSON
+            messages.forEach(msg => {
+                // Tạo thẻ bao ngoài
+                const rowDiv = document.createElement("div");
+                rowDiv.classList.add("msg-row");
+                // Thêm class 'sent' hoặc 'received' dựa trên dữ liệu JSON
+                rowDiv.classList.add(msg.type === 'sent' ? 'sent' : 'received');
+
+                // Nội dung tin nhắn
+                const contentDiv = document.createElement("div");
+                contentDiv.classList.add("msg-content");
+                contentDiv.textContent = msg.message; // Dùng textContent để chống XSS
+
+                // Thời gian
+                const timeDiv = document.createElement("span");
+                timeDiv.classList.add("msg-time");
+                timeDiv.innerText = msg.timestamp;
+
+                rowDiv.appendChild(contentDiv);
+                rowDiv.appendChild(timeDiv);
+                chatBox.appendChild(rowDiv);
+            });
+
+            // Tự động cuộn xuống dưới cùng để xem tin mới nhất
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+        } catch (error) {
+            console.error("Polling error:", error);
+        }
+    }
+
+    // Gọi hàm này mỗi 1000ms (1 giây)
+    setInterval(fetchMessages, 1000);
+
+    // Gọi ngay lập tức khi tải trang
+    fetchMessages();
+</script>
+
 </body>
 </html>

@@ -69,7 +69,17 @@ def handle_incoming_connection(connection):
     This runs in a new thread for each connection.
     """
     try:
-        data = connection.recv(1024)
+        fragments = []
+        while True:
+            chunk = connection.recv(4096) 
+            if not chunk: 
+                break
+            fragments.append(chunk)
+            # Nếu gói tin nhỏ hơn buffer size, có thể là đã hết tin
+            if len(chunk) < 4096: 
+                break
+        
+        data = b"".join(fragments)
         if data:
             message_str = data.decode("utf-8")
 
@@ -161,7 +171,7 @@ def send_message(target_ip, target_port, content):
     try:
         # Create a new socket for this *outgoing* connection
         client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        client_socket.settimeout(100)
+        client_socket.settimeout(10)
 
         client_socket.connect((target_ip, target_port))
         client_socket.sendall(message.encode("utf-8"))
@@ -391,6 +401,63 @@ def display_message(message_list):
     for sender, timestamp, message in message_list:
         html_message += f"<b>{sender}</b> (<em>{timestamp}</em>): {message}<br>"
     return html_message
+
+
+
+# --- THÊM VÀO start_p2p.py ---
+
+@app.route("/get-messages", methods=["GET"])
+def get_chat_messages(headers, body):
+    """API trả về JSON lịch sử chat P2P"""
+    try:
+        peer_ip = headers["query"]["ip"]
+        peer_port = headers["query"]["port"]
+        peer_address = f"{peer_ip}:{peer_port}"
+        
+        # Lấy lịch sử từ biến chat_history (đã được thread handle_incoming_connection cập nhật)
+        history = chat_history.get(peer_address, [])
+        
+        # Chuyển đổi dữ liệu sang list of dict để convert thành JSON
+        json_data = []
+        if isinstance(history, list):
+            for direction, timestamp, content in history:
+                json_data.append({
+                    "sender": "Me" if direction == "sent" else peer_address,
+                    "timestamp": timestamp,
+                    "message": content,
+                    "type": direction # 'sent' hoặc 'received'
+                })
+        
+        import json
+        return json.dumps(json_data)
+    except Exception as e:
+        print(f"Error getting messages: {e}")
+        return "[]"
+
+@app.route("/get-channel-messages", methods=["GET"])
+def get_channel_messages(headers, body):
+    """API trả về JSON lịch sử chat Channel"""
+    try:
+        channel_name = headers["query"]["name"]
+        history = channel_history.get(channel_name, [])
+        
+        json_data = []
+        if isinstance(history, list):
+            for sender, timestamp, content in history:
+                json_data.append({
+                    "sender": sender,
+                    "timestamp": timestamp,
+                    "message": content,
+                    "type": "channel"
+                })
+        
+        import json
+        return json.dumps(json_data)
+    except Exception as e:
+        print(f"Error getting channel messages: {e}")
+        return "[]"
+
+
 
 
 if __name__ == "__main__":
