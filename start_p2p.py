@@ -157,14 +157,16 @@ def send_message(target_ip, target_port, content):
     message = f"{my_listening_address} {timestamp} {content}"
 
     target_address_str = f"{target_ip}:{target_port}"
-
+    print("\nAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n" + message)
     try:
         # Create a new socket for this *outgoing* connection
         client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         client_socket.settimeout(10)
-
+        print("11111111111111111111111")
         client_socket.connect((target_ip, target_port))
+        print("222222222222222222222222")
         client_socket.sendall(message.encode("utf-8"))
+        print("33333333333333333333333")
 
         print(f"\n[Message sent to {target_address_str}]\n")
 
