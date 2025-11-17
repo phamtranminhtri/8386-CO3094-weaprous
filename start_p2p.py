@@ -168,6 +168,16 @@ def send_message(target_ip, target_port, content):
 
     target_address_str = f"{target_ip}:{target_port}"
 
+    if content.startswith("[Channel]"):
+        # Logic channel giữ nguyên nếu có
+        pass 
+    else:
+        with history_lock:
+            if target_address_str not in chat_history:
+                chat_history[target_address_str] = []
+            # Lưu tin nhắn vào lịch sử ngay lập tức
+            chat_history[target_address_str].append(("sent", timestamp, content))
+    
     try:
         # Create a new socket for this *outgoing* connection
         client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
