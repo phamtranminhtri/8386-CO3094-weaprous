@@ -152,6 +152,7 @@ def send_message(target_ip, target_port, content):
 
     # Format the message
     # Format: [sender's listening IP:port] [time] [content]
+    print(f"[SEND TO] {target_ip}:{target_port}")
     message = f"{my_listening_address} {timestamp} {content}"
 
     target_address_str = f"{target_ip}:{target_port}"
@@ -323,9 +324,6 @@ def connect_channel(headers, body):
     channel_name = body.get("channel-name", "")
     addresses = body.get("peer-list", "")
     address_list = addresses.split("_")
-
-    # if channel_name in channels:
-    #     return {"auth": "true", "redirect": f"/channel?name={urllib.parse.quote(channel_name)}"}
 
     channels[channel_name] = address_list
     message_to_send = "___".join(
